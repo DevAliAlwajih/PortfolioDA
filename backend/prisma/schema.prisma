@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkType {
+  WEB
+  MOBILE
+  DESKTOP
+  OTHER
+}
+
+model Admin {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
+  passwordHash String
+  resetCode    String?
+  resetExpires DateTime?
+  createdAt    DateTime  @default(now())
+}
+
+// Single row (id = 1): the fixed header, About and Vision.
+model Profile {
+  id        Int     @id @default(1)
+  nameAr    String  @default("")
+  nameEn    String  @default("")
+  phone     String  @default("")
+  photoUrl  String  @default("")
+  aboutAr   String  @default("")
+  aboutEn   String  @default("")
+  visionAr  String  @default("")
+  visionEn  String  @default("")
+}
+
+// Extra sections the owner adds (text blocks).
+model Section {
+  id      Int    @id @default(autoincrement())
+  titleAr String @default("")
+  titleEn String @default("")
+  bodyAr  String @default("")
+  bodyEn  String @default("")
+  order   Int    @default(0)
+}
+
+model Work {
+  id        Int        @id @default(autoincrement())
+  type      WorkType   @default(WEB)
+  titleAr   String     @default("")
+  titleEn   String     @default("")
+  version   String     @default("")
+  summaryAr String     @default("")
+  summaryEn String     @default("")
+  imageUrl  String     @default("")
+  link      String     @default("")
+  // Detail page: intro, usage policy, and how-to steps [{textAr,textEn,imageUrl}]
+  introAr   String     @default("")
+  introEn   String     @default("")
+  policyAr  String     @default("")
+  policyEn  String     @default("")
+  steps     Json       @default("[]")
+  gallery   Json       @default("[]")
+  order     Int        @default(0)
+  files     WorkFile[]
+}
+
+model WorkFile {
+  id     Int    @id @default(autoincrement())
+  workId Int
+  name   String
+  url    String
+  size   Int    @default(0)
+  work   Work   @relation(fields: [workId], references: [id], onDelete: Cascade)
+}
+
+model Link {
+  id    Int    @id @default(autoincrement())
+  title String
+  url   String
+  order Int    @default(0)
+}
+
+model Contact {
+  id    Int    @id @default(autoincrement())
+  title String
+  value String
+  order Int    @default(0)
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String
+  rating    Int
+  comment   String
+  approved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
