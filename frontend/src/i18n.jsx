@@ -11,7 +11,7 @@ const UI = {
     yourName: 'الاسم', yourEmail: 'الإيميل (لا يظهر للزوار)', yourComment: 'تعليقك', send: 'إرسال',
     thanks: 'شكرًا لك. سيظهر تقييمك بعد مراجعته.', failed: 'تعذر الإرسال. حاول لاحقًا.',
     admin: 'الإدارة', lang: 'English', loading: 'جارٍ التحميل…', notFound: 'الصفحة غير موجودة.',
-    stars: 'نجوم',
+    stars: 'نجوم', platform: 'منصة التطوير الرقمي',
   },
   en: {
     about: 'About', vision: 'Vision', works: 'Works', links: 'Links', contact: 'Contact', rating: 'Reviews',
@@ -23,7 +23,7 @@ const UI = {
     yourName: 'Name', yourEmail: 'Email (not shown to visitors)', yourComment: 'Your comment', send: 'Send',
     thanks: 'Thank you. Your review will appear once it is approved.', failed: 'Could not send. Try again later.',
     admin: 'Admin', lang: 'العربية', loading: 'Loading…', notFound: 'Page not found.',
-    stars: 'stars',
+    stars: 'stars', platform: 'Digital Development Platform',
   },
 };
 

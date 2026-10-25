@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { useLang } from '../i18n.jsx';
+import { Brand, Footer } from '../components/Brand.jsx';
 
 const fmtSize = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
@@ -24,9 +25,12 @@ export default function WorkPage() {
 
   return (
     <div className="wrap narrow">
-      <div className="topbar">
-        <Link className="btn" to="/">← {t('back')}</Link>
-        <button className="lang" onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}>{t('lang')}</button>
+      <div className="brandbar">
+        <Brand />
+        <div className="brandbar-actions">
+          <Link className="btn" to="/">← {t('back')}</Link>
+          <button className="lang" onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}>{t('lang')}</button>
+        </div>
       </div>
 
       <header className="work-head">
@@ -88,6 +92,8 @@ export default function WorkPage() {
           </ul>
         </section>
       )}
+
+      <Footer />
     </div>
   );
 }
