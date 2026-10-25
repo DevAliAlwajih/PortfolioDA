@@ -50,19 +50,46 @@ function ReviewForm() {
   );
 }
 
-function ReviewsDropdown({ reviews, detailsRef }) {
-  const { t, lang } = useLang();
+function RatingBadge({ reviews, onClick }) {
+  const { t } = useLang();
   const avg = reviews.length ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
+  const rounded = Math.round(avg);
+
   return (
-    <details className="reviews glass" ref={detailsRef} id="rating">
-      <summary>
-        <span>{t('reviews')}</span>
-        <span className="avg">{reviews.length ? `${avg.toFixed(1)} ★ (${reviews.length})` : ''}</span>
-      </summary>
-      <div className="reviews-body">
+    <button
+      type="button"
+      className="rating-badge glass"
+      onClick={onClick}
+      aria-label={`${t('reviews')}: ${avg.toFixed(1)} ${t('stars')} (${reviews.length})`}
+    >
+      <div className="rating-badge-top">
+        <span className="rating-score">{reviews.length ? avg.toFixed(1) : '—'}</span>
+        <div className="rating-stars-row">
+          {[1,2,3,4,5].map((n) => (
+            <span key={n} className={n <= rounded ? 'rb-star on' : 'rb-star'}>
+              ★
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="rating-badge-bottom">
+        <span className="rating-label">{t('reviews')}</span>
+        <span className="rating-count">{reviews.length} {t('reviewers') || '💬'}</span>
+      </div>
+      <span className="rating-arrow">↗</span>
+    </button>
+  );
+}
+
+function ReviewsSection({ reviews, sectionRef }) {
+  const { t, lang } = useLang();
+  return (
+    <section id="rating" ref={sectionRef} className="centered">
+      <h2>{t('reviews')}</h2>
+      <div className="reviews-list">
         {reviews.length === 0 && <p className="muted">{t('noReviews')}</p>}
         {reviews.map((r) => (
-          <article key={r.id} className="review">
+          <article key={r.id} className="review glass">
             <div className="review-top">
               <strong>{r.name}</strong>
               <Stars value={r.rating} label={t('stars')} />
@@ -73,9 +100,9 @@ function ReviewsDropdown({ reviews, detailsRef }) {
             </time>
           </article>
         ))}
-        <ReviewForm />
       </div>
-    </details>
+      <ReviewForm />
+    </section>
   );
 }
 
@@ -106,6 +133,7 @@ export default function Home() {
   const [error, setError] = useState(false);
   const [filter, setFilter] = useState('ALL');
   const reviewsRef = useRef(null);
+  const reviewsSectionRef = useRef(null);
 
   useEffect(() => {
     api.get('/public').then(setData).catch(() => setError(true));
@@ -121,8 +149,9 @@ export default function Home() {
   const name = tr(profile, 'name');
 
   const openReviews = () => {
-    if (reviewsRef.current) reviewsRef.current.open = true;
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (reviewsSectionRef.current) {
+      reviewsSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
   const nav = [
@@ -132,33 +161,37 @@ export default function Home() {
 
   return (
     <div className="wrap">
-      {/* Centered hero header */}
+      {/* Two-column header: left=name+phone, right=photo+reviews */}
       <header className="identity">
         <div className="top-tools">
           <button className="lang" onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}>{t('lang')}</button>
           <Link className="lang" to="/admin">{t('admin')}</Link>
         </div>
 
-        <div className="photo-wrap">
-          {profile?.photoUrl
-            ? <img className="photo" src={profile.photoUrl} alt={name} />
-            : <div className="photo ph" aria-hidden="true">{name.slice(0, 1)}</div>}
+        {/* LEFT col: name + phone */}
+        <div className="identity-info">
+          <h1>{name}</h1>
+          {profile?.phone && (
+            <a className="phone" dir="ltr" href={`tel:${profile.phone.replace(/\s/g, '')}`}>
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.6a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 3h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 10.59a16 16 0 0 0 6 6l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 17z"/>
+              </svg>
+              {profile.phone}
+            </a>
+          )}
         </div>
 
-        <h1>{name}</h1>
-
-        {profile?.phone && (
-          <a className="phone" dir="ltr" href={`tel:${profile.phone.replace(/\s/g, '')}`}>
-            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.6a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 3h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 10.59a16 16 0 0 0 6 6l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 17z"/>
-            </svg>
-            {profile.phone}
-          </a>
-        )}
-
-        <div className="reviews-wrap">
-          <ReviewsDropdown reviews={reviews} detailsRef={reviewsRef} />
+        {/* RIGHT col: photo + rating badge below */}
+        <div className="identity-right">
+          <div className="photo-wrap">
+            {profile?.photoUrl
+              ? <img className="photo" src={profile.photoUrl} alt={name} />
+              : <div className="photo ph" aria-hidden="true">{name.slice(0, 1)}</div>}
+          </div>
+          <div className="reviews-wrap">
+            <RatingBadge reviews={reviews} onClick={openReviews} ref={reviewsRef} />
+          </div>
         </div>
       </header>
 
@@ -223,6 +256,8 @@ export default function Home() {
             <p className="prose">{tr(s, 'body')}</p>
           </section>
         ))}
+
+        <ReviewsSection reviews={reviews} sectionRef={reviewsSectionRef} />
       </main>
     </div>
   );
