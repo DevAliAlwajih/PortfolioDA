@@ -383,21 +383,182 @@ function ReviewsAdmin() {
 
 /* ---------- account ---------- */
 
-function Account({ email }) {
-  const [f, setF] = useState({ current: '', next: '' });
-  const [notify, note] = useNotice();
-  const save = async (e) => {
-    e.preventDefault();
-    try { await api.post('/auth/change-password', f); setF({ current: '', next: '' }); notify('تم تغيير كلمة السر'); } catch (x) { notify(x.message, true); }
+function useResend(onResend) {
+  const [secs, setSecs] = useState(0);
+  const start = () => {
+    setSecs(60);
+    onResend();
   };
+  useEffect(() => {
+    if (secs <= 0) return;
+    const id = setTimeout(() => setSecs((s) => s - 1), 1000);
+    return () => clearTimeout(id);
+  }, [secs]);
+  return [secs, start];
+}
+
+function Account({ email, onEmailChange }) {
+  // ── Email change state ──────────────────────────────────────────────────
+  const [emailStep, setEmailStep] = useState(1);
+  const [newEmail, setNewEmail] = useState('');
+  const [emailPwd, setEmailPwd] = useState('');
+  const [emailCode, setEmailCode] = useState('');
+  const [emailMsg, setEmailMsg] = useState(null);
+  const [emailBusy, setEmailBusy] = useState(false);
+
+  // ── Password change state ───────────────────────────────────────────────
+  const [pwdStep, setPwdStep] = useState(1);
+  const [curPwd, setCurPwd] = useState('');
+  const [newPwd, setNewPwd] = useState('');
+  const [confirmPwd, setConfirmPwd] = useState('');
+  const [pwdCode, setPwdCode] = useState('');
+  const [pwdMsg, setPwdMsg] = useState(null);
+  const [pwdBusy, setPwdBusy] = useState(false);
+
+  const handle401 = (err) => {
+    if (err.status === 401) { setToken(''); window.location.reload(); }
+  };
+
+  // ── Email change handlers ───────────────────────────────────────────────
+  const sendEmailCode = async (e) => {
+    if (e) e.preventDefault();
+    setEmailMsg(null); setEmailBusy(true);
+    try {
+      await api.post('/auth/change-email/request', { newEmail, password: emailPwd });
+      setEmailStep(2);
+      setEmailMsg({ text: null });
+    } catch (x) { handle401(x); setEmailMsg({ err: true, text: x.message }); }
+    setEmailBusy(false);
+  };
+  const [emailSecs, startEmailResend] = useResend(sendEmailCode);
+
+  const confirmEmail = async (e) => {
+    e.preventDefault(); setEmailMsg(null); setEmailBusy(true);
+    try {
+      const r = await api.post('/auth/change-email/confirm', { code: emailCode });
+      setToken(r.token);
+      if (onEmailChange) onEmailChange(r.email);
+      setEmailStep(1); setNewEmail(''); setEmailPwd(''); setEmailCode('');
+      setEmailMsg({ text: 'تم تغيير الإيميل بنجاح' });
+    } catch (x) { handle401(x); setEmailMsg({ err: true, text: x.message }); }
+    setEmailBusy(false);
+  };
+
+  // ── Password change handlers ────────────────────────────────────────────
+  const sendPwdCode = async (e) => {
+    if (e) e.preventDefault();
+    if (newPwd !== confirmPwd) { setPwdMsg({ err: true, text: 'كلمة السر الجديدة وتأكيدها غير متطابقين' }); return; }
+    setPwdMsg(null); setPwdBusy(true);
+    try {
+      await api.post('/auth/change-password/request', { currentPassword: curPwd, newPassword: newPwd });
+      setPwdStep(2);
+      setPwdMsg({ text: null });
+    } catch (x) { handle401(x); setPwdMsg({ err: true, text: x.message }); }
+    setPwdBusy(false);
+  };
+  const [pwdSecs, startPwdResend] = useResend(sendPwdCode);
+
+  const confirmPwdChange = async (e) => {
+    e.preventDefault(); setPwdMsg(null); setPwdBusy(true);
+    try {
+      const r = await api.post('/auth/change-password/confirm', { code: pwdCode });
+      setToken(r.token);
+      setPwdStep(1); setCurPwd(''); setNewPwd(''); setConfirmPwd(''); setPwdCode('');
+      setPwdMsg({ text: 'تم تغيير كلمة السر بنجاح' });
+    } catch (x) { handle401(x); setPwdMsg({ err: true, text: x.message }); }
+    setPwdBusy(false);
+  };
+
   return (
-    <form onSubmit={save} className="form narrow-form">
+    <div className="form narrow-form">
       <p>الحساب: <strong dir="ltr">{email}</strong></p>
-      <Field label="كلمة السر الحالية"><input type="password" required dir="ltr" value={f.current} onChange={(e) => setF({ ...f, current: e.target.value })} /></Field>
-      <Field label="كلمة السر الجديدة (8 أحرف على الأقل)"><input type="password" required minLength={8} dir="ltr" value={f.next} onChange={(e) => setF({ ...f, next: e.target.value })} /></Field>
-      <button className="btn primary">تغيير كلمة السر</button>
-      {note}
-    </form>
+
+      {/* ── Email change section ──────────────────────────────────────── */}
+      <fieldset>
+        <legend>تغيير الإيميل</legend>
+        {emailStep === 1 && (
+          <form onSubmit={sendEmailCode}>
+            <Field label="الإيميل الجديد">
+              <input id="new-email" type="email" required dir="ltr" value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)} />
+            </Field>
+            <Field label="كلمة السر الحالية">
+              <input id="email-change-pwd" type="password" required dir="ltr" value={emailPwd}
+                onChange={(e) => setEmailPwd(e.target.value)} />
+            </Field>
+            <button id="send-email-code-btn" className="btn primary" disabled={emailBusy}>إرسال رمز التحقق</button>
+            {emailMsg?.text && <p className={emailMsg.err ? 'err' : 'ok'} role="status">{emailMsg.text}</p>}
+          </form>
+        )}
+        {emailStep === 2 && (
+          <form onSubmit={confirmEmail}>
+            <p className="muted">أرسلنا رمزًا من 6 أرقام إلى <strong dir="ltr">{newEmail}</strong></p>
+            <Field label="رمز التحقق">
+              <input id="email-otp" dir="ltr" inputMode="numeric" maxLength={6} required value={emailCode}
+                onChange={(e) => setEmailCode(e.target.value)} />
+            </Field>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button id="confirm-email-btn" className="btn primary" disabled={emailBusy}>تأكيد تغيير الإيميل</button>
+              <button type="button" className="btn"
+                onClick={() => { setEmailStep(1); setEmailCode(''); setEmailMsg(null); }}>
+                إلغاء / تعديل الإيميل
+              </button>
+              <button type="button" className="btn" id="resend-email-btn"
+                disabled={emailSecs > 0 || emailBusy}
+                onClick={startEmailResend}>
+                إعادة إرسال الرمز{emailSecs > 0 ? ` (${emailSecs}s)` : ''}
+              </button>
+            </div>
+            {emailMsg?.text && <p className={emailMsg.err ? 'err' : 'ok'} role="status">{emailMsg.text}</p>}
+          </form>
+        )}
+      </fieldset>
+
+      {/* ── Password change section ───────────────────────────────────── */}
+      <fieldset style={{ marginTop: '1.5rem' }}>
+        <legend>تغيير كلمة السر</legend>
+        {pwdStep === 1 && (
+          <form onSubmit={sendPwdCode}>
+            <Field label="كلمة السر الحالية">
+              <input id="cur-pwd" type="password" required dir="ltr" value={curPwd}
+                onChange={(e) => setCurPwd(e.target.value)} />
+            </Field>
+            <Field label="كلمة السر الجديدة (8 أحرف على الأقل)">
+              <input id="new-pwd" type="password" required minLength={8} dir="ltr" value={newPwd}
+                onChange={(e) => setNewPwd(e.target.value)} />
+            </Field>
+            <Field label="تأكيد كلمة السر الجديدة">
+              <input id="confirm-pwd" type="password" required minLength={8} dir="ltr" value={confirmPwd}
+                onChange={(e) => setConfirmPwd(e.target.value)} />
+            </Field>
+            <button id="send-pwd-code-btn" className="btn primary" disabled={pwdBusy}>إرسال رمز التحقق إلى إيميلي</button>
+            {pwdMsg?.text && <p className={pwdMsg.err ? 'err' : 'ok'} role="status">{pwdMsg.text}</p>}
+          </form>
+        )}
+        {pwdStep === 2 && (
+          <form onSubmit={confirmPwdChange}>
+            <p className="muted">أرسلنا رمزًا من 6 أرقام إلى <strong dir="ltr">{email}</strong></p>
+            <Field label="رمز التحقق">
+              <input id="pwd-otp" dir="ltr" inputMode="numeric" maxLength={6} required value={pwdCode}
+                onChange={(e) => setPwdCode(e.target.value)} />
+            </Field>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button id="confirm-pwd-btn" className="btn primary" disabled={pwdBusy}>تأكيد تغيير كلمة السر</button>
+              <button type="button" className="btn"
+                onClick={() => { setPwdStep(1); setPwdCode(''); setPwdMsg(null); }}>
+                إلغاء / تعديل
+              </button>
+              <button type="button" className="btn" id="resend-pwd-btn"
+                disabled={pwdSecs > 0 || pwdBusy}
+                onClick={startPwdResend}>
+                إعادة إرسال الرمز{pwdSecs > 0 ? ` (${pwdSecs}s)` : ''}
+              </button>
+            </div>
+            {pwdMsg?.text && <p className={pwdMsg.err ? 'err' : 'ok'} role="status">{pwdMsg.text}</p>}
+          </form>
+        )}
+      </fieldset>
+    </div>
   );
 }
 
@@ -469,7 +630,7 @@ export default function Admin() {
             ]} />
         )}
         {tab === 'reviews' && <ReviewsAdmin />}
-        {tab === 'account' && <Account email={me} />}
+        {tab === 'account' && <Account email={me} onEmailChange={setMe} />}
       </div>
     </div>
   );
