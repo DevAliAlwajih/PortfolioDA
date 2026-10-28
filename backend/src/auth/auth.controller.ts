@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Post, Req, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { IsEmail, IsString, Length, MinLength } from 'class-validator';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { PrismaService } from '../common/prisma.service';
 
 class LoginDto {
   @IsEmail() email: string;
@@ -23,7 +24,10 @@ class ChangeDto {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('login')
@@ -45,8 +49,10 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  me(@Req() req: any) {
-    return { email: req.admin.email };
+  async me(@Req() req: any) {
+    const admin = await this.prisma.admin.findUnique({ where: { id: req.admin.sub } });
+    if (!admin) throw new NotFoundException('Admin not found');
+    return { email: admin.email };
   }
 
   @UseGuards(JwtAuthGuard)

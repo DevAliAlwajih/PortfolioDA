@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useLang } from '../i18n.jsx';
+import { Brand, Footer } from '../components/Brand.jsx';
 
 function Stars({ value, onChange, label }) {
   return (
@@ -132,7 +133,6 @@ export default function Home() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(false);
   const [filter, setFilter] = useState('ALL');
-  const reviewsRef = useRef(null);
   const reviewsSectionRef = useRef(null);
 
   useEffect(() => {
@@ -161,38 +161,33 @@ export default function Home() {
 
   return (
     <div className="wrap">
-      {/* Two-column header: left=name+phone, right=photo+reviews */}
-      <header className="identity">
-        <div className="top-tools">
+      {/* Top brand bar */}
+      <div className="brandbar">
+        <Brand />
+        <div className="brandbar-actions">
           <button className="lang" onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}>{t('lang')}</button>
           <Link className="lang" to="/admin">{t('admin')}</Link>
         </div>
+      </div>
 
-        {/* LEFT col: name + phone */}
-        <div className="identity-info">
-          <h1>{name}</h1>
-          {profile?.phone && (
-            <a className="phone" dir="ltr" href={`tel:${profile.phone.replace(/\s/g, '')}`}>
-              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.6a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 3h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 10.59a16 16 0 0 0 6 6l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 17z"/>
-              </svg>
-              {profile.phone}
-            </a>
-          )}
+      {/* Centered hero header */}
+      <header className="hero">
+        <div className="photo-wrap">
+          {profile?.photoUrl
+            ? <img className="photo" src={profile.photoUrl} alt={name} />
+            : <div className="photo ph" aria-hidden="true">{name.slice(0, 1)}</div>}
         </div>
-
-        {/* RIGHT col: photo + rating badge below */}
-        <div className="identity-right">
-          <div className="photo-wrap">
-            {profile?.photoUrl
-              ? <img className="photo" src={profile.photoUrl} alt={name} />
-              : <div className="photo ph" aria-hidden="true">{name.slice(0, 1)}</div>}
-          </div>
-          <div className="reviews-wrap">
-            <RatingBadge reviews={reviews} onClick={openReviews} ref={reviewsRef} />
-          </div>
-        </div>
+        <h1 className="hero-name">{name}</h1>
+        {profile?.phone && (
+          <a className="phone" dir="ltr" href={`tel:${profile.phone.replace(/\s/g, '')}`}>
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.6a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 3h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 10.59a16 16 0 0 0 6 6l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 17z"/>
+            </svg>
+            {profile.phone}
+          </a>
+        )}
+        <RatingBadge reviews={reviews} onClick={openReviews} />
       </header>
 
       <nav className="nav glass" aria-label="Sections">
@@ -259,6 +254,7 @@ export default function Home() {
 
         <ReviewsSection reviews={reviews} sectionRef={reviewsSectionRef} />
       </main>
+      <Footer />
     </div>
   );
 }

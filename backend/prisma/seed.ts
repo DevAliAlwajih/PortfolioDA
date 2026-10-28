@@ -4,16 +4,20 @@ import * as bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
-  const password = process.env.ADMIN_PASSWORD || '';
-  if (!email || password.length < 8) {
-    throw new Error('Set ADMIN_EMAIL and ADMIN_PASSWORD (8+ characters) in .env first');
+  const existingCount = await prisma.admin.count();
+  if (existingCount > 0) {
+    console.log('Admin already exists, skipping');
+  } else {
+    const email = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+    const password = process.env.ADMIN_PASSWORD || '';
+    if (!email || password.length < 8) {
+      throw new Error('Set ADMIN_EMAIL and ADMIN_PASSWORD (8+ characters) in .env first');
+    }
+    await prisma.admin.create({
+      data: { email, passwordHash: await bcrypt.hash(password, 12) },
+    });
+    console.log(`Admin ready: ${email}`);
   }
-  await prisma.admin.upsert({
-    where: { email },
-    update: { passwordHash: await bcrypt.hash(password, 12) },
-    create: { email, passwordHash: await bcrypt.hash(password, 12) },
-  });
   await prisma.profile.upsert({
     where: { id: 1 },
     update: {},
@@ -27,7 +31,6 @@ async function main() {
       visionEn: 'I build clear, fast software that serves people in their own language.',
     },
   });
-  console.log(`Admin ready: ${email}`);
 }
 
 main().finally(() => prisma.$disconnect());

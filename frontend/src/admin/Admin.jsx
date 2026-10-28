@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, getToken, setToken } from '../api.js';
+import { Brand, LogoPlate } from '../components/Brand.jsx';
 
 /* ---------- small building blocks ---------- */
 
@@ -91,6 +92,7 @@ function Auth({ onDone }) {
 
   return (
     <div className="auth glass">
+      <LogoPlate width={240} />
       <h1>لوحة الإدارة</h1>
       {mode === 'login' && (
         <form onSubmit={login}>
@@ -427,9 +429,12 @@ export default function Admin() {
 
   return (
     <div className="wrap admin" dir="rtl">
-      <div className="topbar">
-        <Link className="btn" to="/">← الصفحة الرئيسية</Link>
-        <button className="btn" onClick={() => { setToken(''); setMe(null); }}>تسجيل الخروج</button>
+      <div className="brandbar">
+        <Brand />
+        <div className="brandbar-actions">
+          <Link className="btn" to="/">← الصفحة الرئيسية</Link>
+          <button className="btn" onClick={() => { setToken(''); setMe(null); }}>تسجيل الخروج</button>
+        </div>
       </div>
       <h1>لوحة الإدارة</h1>
       <div className="tabs" role="tablist">

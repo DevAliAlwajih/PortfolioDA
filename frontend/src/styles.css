@@ -59,52 +59,102 @@ p { margin: 0; }
 .pill.dim { border-color: var(--line); color: var(--ink-dim); background: var(--glass); }
 .pill.warn { border-color: rgba(245,194,107,.5); color: var(--amber); background: rgba(245,194,107,.1); }
 
-/* ── Identity header: right=photo+reviews, left=name+phone ─────────── */
-.identity {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  grid-template-rows: auto auto;
-  grid-template-areas:
-    "tools  tools"
-    "info   right";
-  column-gap: 40px;
-  row-gap: 20px;
-  padding-block: 12px 36px;
+/* ── Brand bar ───────────────────────────────────────────────────────── */
+.brandbar {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-block: 14px 10px;
 }
-.identity > * { min-width: 0; }
-
-/* top-tools: always at end edge */
-.top-tools {
-  grid-area: tools;
+.brandbar-actions {
   display: flex;
   gap: 8px;
+  align-items: center;
   flex-wrap: wrap;
-  justify-content: flex-end;
 }
 
-/* LEFT col: name + phone, vertically centered */
-.identity-info {
-  grid-area: info;
+/* ── Brand link ──────────────────────────────────────────────────────── */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.brand-emblem {
+  height: 40px;
+  width: auto;
+  filter: drop-shadow(0 0 8px rgba(111,208,255,.5));
+  flex-shrink: 0;
+}
+.brand-text {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 18px;
+  gap: 1px;
+  line-height: 1.2;
+}
+.brand-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.brand-sub {
+  font-size: 12px;
+  color: var(--ink-dim);
+  white-space: nowrap;
 }
 
-/* RIGHT col: photo on top, reviews below */
-.identity-right {
-  grid-area: right;
+/* ── Logo plate (light background for full logo) ─────────────────────── */
+.logo-plate {
+  background: #eef4ff;
+  border: 1px solid rgba(255,255,255,.5);
+  border-radius: var(--radius);
+  padding: 14px 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 32px rgba(111,208,255,.18);
+}
+.logo-plate-img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────── */
+.footer {
+  border-top: 1px solid var(--line);
+  padding-block: 40px 30px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 16px;
+  margin-top: 40px;
+}
+.footer-copy {
+  font-size: 14px;
 }
 
-/* reviews inside right col */
-.reviews-wrap {
-  width: 300px;
-  max-width: 340px;
+/* ── Centered hero ───────────────────────────────────────────────────── */
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding-block: 32px 40px;
+  text-align: center;
+}
+
+.hero-name {
+  font-size: clamp(40px, 7vw, 72px);
+  font-weight: 600;
+  letter-spacing: -.02em;
+  line-height: 1.1;
+  text-wrap: balance;
+  margin: 0;
 }
 
 /* blob photo frame */
@@ -114,22 +164,25 @@ p { margin: 0; }
   66%       { border-radius: 55% 45% 62% 38% / 42% 58% 42% 58%; }
 }
 .photo-wrap {
-  --blob-size: 240px;
+  --blob-size: 280px;
   width: var(--blob-size);
   height: var(--blob-size);
-  padding: 4px;
+  padding: 3px;
   border-radius: 63% 37% 54% 46% / 55% 48% 52% 45%;
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   box-shadow: 0 0 40px 6px rgba(111,208,255,.35);
   animation: blob-morph 12s ease-in-out infinite;
   flex-shrink: 0;
+  overflow: hidden;
+  margin-inline: auto;
 }
 .photo {
   width: 100%;
   height: 100%;
   aspect-ratio: 1;
   object-fit: cover;
-  border-radius: inherit;
+  border-radius: 63% 37% 54% 46% / 55% 48% 52% 45%;
+  animation: blob-morph 12s ease-in-out infinite;
   display: block;
 }
 .photo.ph {
@@ -141,16 +194,6 @@ p { margin: 0; }
   color: var(--accent);
 }
 
-/* name */
-.identity h1 {
-  font-size: clamp(32px, 5vw, 64px);
-  font-weight: 600;
-  letter-spacing: -.02em;
-  line-height: 1.1;
-  text-wrap: balance;
-  margin: 0;
-}
-
 /* phone pill */
 .phone {
   display: inline-flex;
@@ -159,7 +202,7 @@ p { margin: 0; }
   text-decoration: none;
   color: var(--ink);
   font-family: var(--font-mono);
-  font-size: 18px;
+  font-size: 20px;
   padding: 10px 22px;
   border-radius: 999px;
   background: var(--glass-strong);
@@ -167,7 +210,6 @@ p { margin: 0; }
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
   transition: transform .2s, border-color .2s;
-  align-self: flex-start;
 }
 .phone svg { color: var(--accent); flex-shrink: 0; }
 .phone:hover { border-color: var(--accent); transform: translateY(-2px); }
@@ -177,6 +219,8 @@ p { margin: 0; }
 .rating-badge {
   position: relative;
   width: 100%;
+  max-width: 360px;
+  margin-inline: auto;
   padding: 18px 22px;
   border: none;
   cursor: pointer;
@@ -364,23 +408,13 @@ legend { padding-inline: 8px; color: var(--accent); font-weight: 500; }
 .row-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
 @media (max-width: 760px) {
-  .photo-wrap { --blob-size: 180px; }
-  .identity {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "tools"
-      "right"
-      "info";
-    text-align: center;
-  }
-  .identity-info { align-items: center; }
-  .phone { align-self: auto; }
-  .reviews-wrap { width: 100%; max-width: 100%; }
+  .photo-wrap { --blob-size: 200px; }
+  .brand-emblem { height: 34px; }
   .two, .crud { grid-template-columns: 1fr; }
   .nav { border-radius: 24px; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   * { transition: none !important; }
-  .photo-wrap { animation: none; }
+  .photo-wrap, .photo { animation: none; }
 }
