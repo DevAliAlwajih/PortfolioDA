@@ -17,7 +17,10 @@ export class MailService {
   async send(to: string, subject: string, text: string) {
     if (!this.transport) {
       // No SMTP configured: print so local development still works.
-      this.log.warn(`SMTP not configured. Email to ${to}\n${subject}\n${text}`);
+      // Never print codes in production.
+      if (process.env.NODE_ENV !== 'production') {
+        this.log.warn(`[DEV] Email to ${to} | Subject: ${subject}\n${text}`);
+      }
       return;
     }
     await this.transport.sendMail({ from: this.from, to, subject, text });

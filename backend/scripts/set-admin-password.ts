@@ -40,6 +40,7 @@ async function main() {
       passwordHash: await bcrypt.hash(newPassword, 12),
       resetCode: null,
       resetExpires: null,
+      tokenVersion: { increment: 1 },
     },
   });
 

@@ -11,6 +11,12 @@ async function bootstrap() {
   if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 16) {
     throw new Error('JWT_SECRET must be set to a random string of at least 16 characters');
   }
+  if (process.env.NODE_ENV === 'production' && !process.env.SMTP_HOST) {
+    throw new Error(
+      'SMTP_HOST must be set in production. Email codes are required for account security changes. ' +
+      'Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS and MAIL_FROM in your environment.',
+    );
+  }
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));

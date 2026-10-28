@@ -15,12 +15,28 @@ enum WorkType {
 }
 
 model Admin {
-  id           Int       @id @default(autoincrement())
-  email        String    @unique
+  id           Int           @id @default(autoincrement())
+  email        String        @unique
   passwordHash String
   resetCode    String?
   resetExpires DateTime?
-  createdAt    DateTime  @default(now())
+  tokenVersion Int           @default(0)
+  createdAt    DateTime      @default(now())
+  actions      AdminAction[]
+}
+
+model AdminAction {
+  id        Int      @id @default(autoincrement())
+  adminId   Int
+  type      String   // "EMAIL_CHANGE" | "PASSWORD_CHANGE"
+  payload   String   // new email, or bcrypt hash of the new password
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+  admin     Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@unique([adminId, type])
 }
 
 // Single row (id = 1): the fixed header, About and Vision.

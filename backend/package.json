@@ -11,7 +11,8 @@
     "prisma:deploy": "prisma migrate deploy",
     "seed": "ts-node prisma/seed.ts",
     "admin:set-email": "ts-node scripts/set-admin-email.ts",
-    "admin:set-password": "ts-node scripts/set-admin-password.ts"
+    "admin:set-password": "ts-node scripts/set-admin-password.ts",
+    "mail:test": "ts-node scripts/send-test-mail.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.0",

@@ -55,6 +55,7 @@ async function main() {
       email: newEmail,
       resetCode: null,
       resetExpires: null,
+      tokenVersion: { increment: 1 },
     },
   });
 

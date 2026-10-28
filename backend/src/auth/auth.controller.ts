@@ -17,9 +17,16 @@ class ResetDto {
   @IsString() @Length(6, 6) code: string;
   @IsString() @MinLength(8) newPassword: string;
 }
-class ChangeDto {
-  @IsString() current: string;
-  @IsString() @MinLength(8) next: string;
+class ChangeEmailRequestDto {
+  @IsEmail() newEmail: string;
+  @IsString() @MinLength(1) password: string;
+}
+class ConfirmCodeDto {
+  @IsString() @Length(6, 6) code: string;
+}
+class ChangePasswordRequestDto {
+  @IsString() @MinLength(1) currentPassword: string;
+  @IsString() @MinLength(8) newPassword: string;
 }
 
 @Controller('auth')
@@ -55,9 +62,35 @@ export class AuthController {
     return { email: admin.email };
   }
 
+  // ─── Email change ─────────────────────────────────────────────────────────
+
   @UseGuards(JwtAuthGuard)
-  @Post('change-password')
-  change(@Req() req: any, @Body() dto: ChangeDto) {
-    return this.auth.changePassword(req.admin.sub, dto.current, dto.next);
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @Post('change-email/request')
+  changeEmailRequest(@Req() req: any, @Body() dto: ChangeEmailRequestDto) {
+    return this.auth.requestEmailChange(req.admin.sub, dto.newEmail, dto.password);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('change-email/confirm')
+  changeEmailConfirm(@Req() req: any, @Body() dto: ConfirmCodeDto) {
+    return this.auth.confirmEmailChange(req.admin.sub, dto.code);
+  }
+
+  // ─── Password change ──────────────────────────────────────────────────────
+
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @Post('change-password/request')
+  changePasswordRequest(@Req() req: any, @Body() dto: ChangePasswordRequestDto) {
+    return this.auth.requestPasswordChange(req.admin.sub, dto.currentPassword, dto.newPassword);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('change-password/confirm')
+  changePasswordConfirm(@Req() req: any, @Body() dto: ConfirmCodeDto) {
+    return this.auth.confirmPasswordChange(req.admin.sub, dto.code);
   }
 }
