@@ -1,5 +1,6 @@
 :root {
   --bg: #0a0f1f;
+  --bg-overlay: .82;
   --ink: #e8edf8;
   --ink-dim: #9aa6c4;
   --accent: #6fd0ff;
@@ -23,6 +24,19 @@ body {
   font-family: var(--font-body); font-size: 16px; line-height: 1.7;
   padding-inline: max(16px, env(safe-area-inset-left, 0px));
   overflow-x: hidden;
+}
+.site-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background: var(--bg) url('/site-bg.png') center top / cover no-repeat;
+}
+.site-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgb(10 15 31 / var(--bg-overlay));
 }
 .glow { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
 .glow::before, .glow::after { content: ""; position: absolute; border-radius: 50%; filter: blur(90px); opacity: .5; }

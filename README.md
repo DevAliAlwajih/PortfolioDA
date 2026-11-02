@@ -91,3 +91,8 @@ set NEW_ADMIN_PASSWORD=
 - Uploads go to `backend/uploads` (200 MB limit per file; HTML, JS, PHP and SVG files are rejected).
   Back this folder up together with your database.
 - Link fields accept only `http(s)://`, `tel:` and `mailto:` addresses.
+
+## Change the background image
+
+To change the site background, replace `frontend/public/site-bg.png` with another image using the same file name. The shading is controlled by the `--bg-overlay` variable in `frontend/src/styles.css` (from `0` for no shading to `1` for fully dark).
+
