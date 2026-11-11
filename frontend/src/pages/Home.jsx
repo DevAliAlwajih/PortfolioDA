@@ -128,6 +128,28 @@ function WorkCard({ w }) {
   );
 }
 
+function contrastColor(hex) {
+  const value = /^#[0-9a-f]{6}$/i.test(hex || '') ? hex.slice(1) : '6fd0ff';
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(value.slice(i, i + 2), 16));
+  return (r * 0.299 + g * 0.587 + b * 0.114) > 160 ? '#111827' : '#ffffff';
+}
+
+function BlockView({ block }) {
+  const { tr } = useLang();
+  const d = block.data || {};
+  if (block.type === 'HEADING') {
+    const Tag = d.level === 3 ? 'h3' : 'h2';
+    return <Tag className="content-heading">{tr(d, 'text')}</Tag>;
+  }
+  if (block.type === 'TEXT') return <p className="block-text">{tr(d, 'text')}</p>;
+  if (block.type === 'LINK') return <a className="content-link" href={d.url} target="_blank" rel="noopener noreferrer">{tr(d, 'title') || d.url}<span aria-hidden="true">↗</span></a>;
+  if (block.type === 'BUTTON') return <a className="content-button" href={d.url} target="_blank" rel="noopener noreferrer" style={{ backgroundColor: d.color || '#6fd0ff', color: contrastColor(d.color) }}>{tr(d, 'label') || d.url}</a>;
+  if (block.type === 'IMAGE') return <figure className="content-image"><img src={d.url} alt={tr(d, 'caption')} loading="lazy" />{(d.captionAr || d.captionEn) && <figcaption>{tr(d, 'caption')}</figcaption>}</figure>;
+  if (block.type === 'GALLERY') return <div className="content-gallery">{(d.images || []).map((url, i) => <a key={url + i} href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt="" loading="lazy" /></a>)}</div>;
+  if (block.type === 'FILE') return <a className="file-block glass" href={d.url} download={d.name || undefined}><span className="file-icon" aria-hidden="true">▣</span><span>{tr(d, 'title') || d.name || 'Download file'}</span>{d.size > 0 && <small>{d.size >= 1048576 ? `${(d.size / 1048576).toFixed(1)} MB` : `${Math.ceil(d.size / 1024)} KB`}</small>}<span className="download-icon" aria-hidden="true">↓</span></a>;
+  return null;
+}
+
 export default function Home() {
   const { t, tr, lang, setLang } = useLang();
   const [data, setData] = useState(null);
@@ -248,7 +270,7 @@ export default function Home() {
         {sections.map((s) => (
           <section key={s.id} id={`sec-${s.id}`} className="centered">
             <h2>{tr(s, 'title')}</h2>
-            <p className="prose">{tr(s, 'body')}</p>
+            <div className="blocks">{s.blocks.map((block) => <BlockView key={block.id} block={block} />)}</div>
           </section>
         ))}
 

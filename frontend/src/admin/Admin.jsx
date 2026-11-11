@@ -233,6 +233,76 @@ function CrudEditor({ resource, fields, blank, titleOf, renderExtra, addLabel })
   );
 }
 
+/* ---------- extra sections: ordered content blocks ---------- */
+
+const BLOCK_DEFAULTS = {
+  HEADING: { textAr: '', textEn: '', level: 2 },
+  TEXT: { textAr: '', textEn: '' },
+  LINK: { titleAr: '', titleEn: '', url: '' },
+  BUTTON: { labelAr: '', labelEn: '', url: '', color: '#6fd0ff' },
+  IMAGE: { url: '', captionAr: '', captionEn: '' },
+  GALLERY: { images: [] },
+  FILE: { url: '', titleAr: '', titleEn: '', name: '', size: 0 },
+};
+const BLOCK_LABELS = { HEADING: 'عنوان', TEXT: 'نص', LINK: 'رابط', BUTTON: 'زر', IMAGE: 'صورة', GALLERY: 'معرض صور', FILE: 'ملف' };
+
+function SectionsEditor() {
+  const [sections, setSections] = useState([]);
+  const [form, setForm] = useState(null);
+  const [dragged, setDragged] = useState(null);
+  const [notify, note] = useNotice();
+  const load = useCallback(async () => {
+    const list = await api.get('/admin/sections');
+    setSections(list);
+    setForm((current) => current?.id ? list.find((s) => s.id === current.id) || null : current);
+    return list;
+  }, []);
+  useEffect(() => { load().catch((x) => notify(x.message, true)); }, [load]);
+  const saveSection = async (e) => {
+    e.preventDefault();
+    try {
+      const saved = form.id ? await api.put(`/admin/sections/${form.id}`, form) : await api.post('/admin/sections', form);
+      const list = await load(); setForm(list.find((s) => s.id === saved.id) || saved); notify('تم الحفظ');
+    } catch (x) { notify(x.message, true); }
+  };
+  const removeSection = async (id) => { try { await api.del(`/admin/sections/${id}`); if (form?.id === id) setForm(null); await load(); } catch (x) { notify(x.message, true); } };
+  const addBlock = async (type) => {
+    try { await api.post(`/admin/sections/${form.id}/blocks`, { type, data: BLOCK_DEFAULTS[type] }); await load(); notify('تمت إضافة البلوك'); }
+    catch (x) { notify(x.message, true); }
+  };
+  const saveBlock = async (block) => { try { await api.put(`/admin/blocks/${block.id}`, { data: block.data }); await load(); notify('تم حفظ البلوك'); } catch (x) { notify(x.message, true); } };
+  const removeBlock = async (id) => { try { await api.del(`/admin/blocks/${id}`); await load(); } catch (x) { notify(x.message, true); } };
+  const reorder = async (blocks) => {
+    const previous = form.blocks;
+    setForm({ ...form, blocks });
+    try { await api.put(`/admin/sections/${form.id}/blocks/reorder`, { ids: blocks.map((b) => b.id) }); await load(); }
+    catch (x) { setForm({ ...form, blocks: previous }); notify(x.message, true); }
+  };
+  const move = (index, delta) => { const next = [...form.blocks]; const target = index + delta; if (target < 0 || target >= next.length) return; [next[index], next[target]] = [next[target], next[index]]; reorder(next); };
+  const upload = async (file, block, key = 'url') => {
+    if (!file) return;
+    try { const uploaded = await api.upload(file); const data = { ...block.data, [key]: uploaded.url }; if (block.type === 'FILE') { data.name = uploaded.name; data.size = uploaded.size; } await api.put(`/admin/blocks/${block.id}`, { data }); await load(); }
+    catch (x) { notify(x.message, true); }
+  };
+  const addGallery = async (files, block) => {
+    try { const uploaded = await Promise.all([...files].map((file) => api.upload(file))); await api.put(`/admin/blocks/${block.id}`, { data: { ...block.data, images: [...(block.data.images || []), ...uploaded.map((x) => x.url)] } }); await load(); }
+    catch (x) { notify(x.message, true); }
+  };
+  const updateLocalBlock = (id, data) => setForm({ ...form, blocks: form.blocks.map((b) => b.id === id ? { ...b, data } : b) });
+  const blockFields = (block) => {
+    const d = block.data || {}; const set = (key, value) => updateLocalBlock(block.id, { ...d, [key]: value });
+    const bilingual = (prefix) => <div className="two"><Field label="العربية"><input value={d[`${prefix}Ar`] || ''} onChange={(e) => set(`${prefix}Ar`, e.target.value)} /></Field><Field label="English"><input dir="ltr" value={d[`${prefix}En`] || ''} onChange={(e) => set(`${prefix}En`, e.target.value)} /></Field></div>;
+    if (block.type === 'HEADING') return <>{bilingual('text')}<Field label="المستوى"><select value={d.level || 2} onChange={(e) => set('level', Number(e.target.value))}><option value={2}>H2</option><option value={3}>H3</option></select></Field></>;
+    if (block.type === 'TEXT') return <div className="two"><Field label="النص العربي"><textarea rows={4} value={d.textAr || ''} onChange={(e) => set('textAr', e.target.value)} /></Field><Field label="English text"><textarea dir="ltr" rows={4} value={d.textEn || ''} onChange={(e) => set('textEn', e.target.value)} /></Field></div>;
+    if (block.type === 'LINK') return <>{bilingual('title')}<Field label="URL"><input dir="ltr" value={d.url || ''} onChange={(e) => set('url', e.target.value)} /></Field></>;
+    if (block.type === 'BUTTON') return <>{bilingual('label')}<Field label="URL"><input dir="ltr" value={d.url || ''} onChange={(e) => set('url', e.target.value)} /></Field><div className="color-row">{['#6fd0ff','#7b8cff','#4ade80','#f5c26b','#ff8a8a','#e8edf8'].map((c) => <button key={c} type="button" className="color-swatch" style={{ background: c }} onClick={() => set('color', c)} aria-label={c} />)}<input type="color" value={d.color || '#6fd0ff'} onChange={(e) => set('color', e.target.value)} /><a className="btn" style={{ background: d.color || '#6fd0ff', color: '#111' }}>معاينة</a></div></>;
+    if (block.type === 'IMAGE') return <>{bilingual('caption')}<Field label="الصورة"><input type="file" accept="image/*" onChange={(e) => upload(e.target.files?.[0], block)} />{d.url && <img className="block-preview" src={d.url} alt="" />}</Field></>;
+    if (block.type === 'GALLERY') return <Field label="صور المعرض"><div className="thumbs">{(d.images || []).map((url, i) => <div className="thumb" key={url + i}><img src={url} alt="" /><button type="button" className="btn small danger" onClick={() => set('images', d.images.filter((_, j) => j !== i))}>×</button></div>)}</div><input type="file" accept="image/*" multiple onChange={(e) => addGallery(e.target.files, block)} /></Field>;
+    return <>{bilingual('title')}<Field label="الملف"><input type="file" onChange={(e) => upload(e.target.files?.[0], block)} />{d.name && <small className="muted">{d.name} · {Math.round((d.size || 0) / 1024)} KB</small>}</Field></>;
+  };
+  return <div className="crud"><aside className="crud-list"><button className="btn primary" onClick={() => setForm({ titleAr: '', titleEn: '', order: sections.length, blocks: [] })}>+ إضافة قسم</button><ul>{sections.map((s) => <li key={s.id} className={form?.id === s.id ? 'on' : ''}><button type="button" className="row-main" onClick={() => setForm(s)}>{s.titleAr || s.titleEn || `#${s.id}`}</button><Confirm onYes={() => removeSection(s.id)}>حذف</Confirm></li>)}</ul></aside><div className="crud-form">{!form ? <p className="muted">اختر قسماً أو أضف قسماً جديداً.</p> : <><form className="form" onSubmit={saveSection}><div className="two"><Field label="عنوان القسم (عربي)"><input value={form.titleAr} onChange={(e) => setForm({ ...form, titleAr: e.target.value })} /></Field><Field label="Section title (English)"><input dir="ltr" value={form.titleEn} onChange={(e) => setForm({ ...form, titleEn: e.target.value })} /></Field></div><Field label="الترتيب"><input type="number" value={form.order} onChange={(e) => setForm({ ...form, order: e.target.value })} /></Field><button className="btn primary">حفظ القسم</button></form>{form.id && <><div className="block-add">{Object.keys(BLOCK_DEFAULTS).map((type) => <button key={type} type="button" className="btn small" onClick={() => addBlock(type)}>+ {BLOCK_LABELS[type]}</button>)}</div><div className="section-blocks">{form.blocks.map((block, i) => <article key={block.id} className="section-block" draggable onDragStart={() => setDragged(i)} onDragOver={(e) => e.preventDefault()} onDrop={() => { if (dragged !== null && dragged !== i) { const next = [...form.blocks]; const [item] = next.splice(dragged, 1); next.splice(i, 0, item); reorder(next); } setDragged(null); }}><div className="block-head"><span className="drag-handle" title="اسحب لإعادة الترتيب">⠿</span><strong className="block-type">{BLOCK_LABELS[block.type]}</strong><span><button type="button" className="btn small" onClick={() => move(i, -1)} disabled={!i}>↑</button><button type="button" className="btn small" onClick={() => move(i, 1)} disabled={i === form.blocks.length - 1}>↓</button><Confirm onYes={() => removeBlock(block.id)}>حذف</Confirm></span></div>{blockFields(block)}<button type="button" className="btn primary small" onClick={() => saveBlock(block)}>حفظ البلوك</button></article>)}</div></>}</>}</div>{note}</div>;
+}
+
 /* ---------- works: usage steps, screenshots, downloadable files ---------- */
 
 function WorkExtras({ form, setForm, reload, notify }) {
@@ -621,14 +691,7 @@ export default function Admin() {
           <CrudEditor resource="contacts" titleOf={(c) => `${c.title}: ${c.value}`} blank={{ title: '', value: '', order: 0 }}
             fields={[{ key: 'title', label: 'العنوان (مثل: واتساب)' }, { key: 'value', label: 'الرقم أو القيمة', ltr: true }, { key: 'order', label: 'الترتيب', type: 'number' }]} />
         )}
-        {tab === 'sections' && (
-          <CrudEditor resource="sections" addLabel="+ إضافة قسم" titleOf={(s) => s.titleAr || s.titleEn} blank={{ titleAr: '', titleEn: '', bodyAr: '', bodyEn: '', order: 0 }}
-            fields={[
-              { key: 'titleAr', label: 'عنوان القسم (عربي)' }, { key: 'titleEn', label: 'Section title (English)', ltr: true },
-              { key: 'bodyAr', label: 'المحتوى (عربي)', type: 'textarea', rows: 6 }, { key: 'bodyEn', label: 'Content (English)', type: 'textarea', rows: 6, ltr: true },
-              { key: 'order', label: 'الترتيب', type: 'number' },
-            ]} />
-        )}
+        {tab === 'sections' && <SectionsEditor />}
         {tab === 'reviews' && <ReviewsAdmin />}
         {tab === 'account' && <Account email={me} onEmailChange={setMe} />}
       </div>

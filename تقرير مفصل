@@ -1,0 +1,72 @@
+### تقرير حالة المشروع وخارطة الاستئناف الفوري
+
+---
+
+### 1. ما تم إنجازه والتحقق منه بالفعل (Completed)
+
+1. **قاعدة البيانات ومخطط Prisma والترحيل (Migration):**
+   - تم إنشاء وتطبيق المهاجرة باسم: `20261102_section_blocks`.
+   - ملف المهاجرة موجود ومكتمل في:
+     [backend/prisma/migrations/20261102_section_blocks/migration.sql](file:///d:/PortfolioDA/backend/prisma/migrations/20261102_section_blocks/migration.sql)
+   - نص الـ SQL للمهاجرة يقوم بـ:
+     1. إنشاء جدول `SectionBlock` بجميع الحقول والفهرس `[sectionId, order]` وقيد الحذف المتتالي `ON DELETE CASCADE`.
+     2. نقل محتوى `bodyAr` و `bodyEn` القديم لأي قسم يحتوي على نص إلى بلوك من نوع `TEXT` بالترتيب `0`.
+     3. حذف أعمدة `bodyAr` و `bodyEn` من جدول `Section`.
+   - تم التحقق من قاعدة بيانات PostgreSQL عبر الاستعلام المباشر: الأقسام الحالية (`Post` و `/>/>`) محفوظة وسليمة تماماً ولم يتم حذف أي بيانات.
+
+2. **الـ Backend (الكونترولرز ومسارات الـ API):**
+   - [backend/src/admin/admin.controller.ts](file:///d:/PortfolioDA/backend/src/admin/admin.controller.ts):
+     - تم إزالة `sections` من الـ generic CRUD لتجنب أي تداخل.
+     - تمت إضافة دوال التحقق `validateBlockData` للأنواع السبعة: `HEADING`, `TEXT`, `LINK`, `BUTTON`, `IMAGE`, `GALLERY`, `FILE`.
+     - تم فحص قيود الـ Validation: الحد الأقصى للنصوص 5000 حرف، لون الزر بنمط `^#[0-9a-fA-F]{6}$`، فحص الروابط (منع `javascript:` وحصرها في `http://`, `https://`, `/uploads/`, `tel:`, `mailto:` للروابط والأزرار)، حصر مستوى العنوان في 2 أو 3، حد المعرض 30 صورة، ورابط الملف `/uploads/`.
+     - مسارات الأقسام والبلوكات الجديدة معرّفة **قبل** مسارات `:resource`:
+       - `GET /admin/sections`
+       - `POST /admin/sections/:id/blocks`
+       - `PUT /admin/blocks/:id`
+       - `DELETE /admin/blocks/:id`
+       - `PUT /admin/sections/:id/blocks/reorder` (تأكيد التطابق الدقيق لـ IDs وعدم التكرار وإلا 400).
+   - [backend/src/public/public.controller.ts](file:///d:/PortfolioDA/backend/src/public/public.controller.ts):
+     - تحديث `GET /public` ليشمل البلوكات مرتبة، واستبعاد الأقسام الفارغة التي ليس لها عنوان أو ليس لها أي بلوك بمحتوى فعلي (`blockHasContent`)، وحذف البلوكات الفارغة من الاستجابة.
+
+---
+
+### 2. ما تبقى للتنفيذ مباشرة عند الاستئناف (Pending Tasks)
+
+1. **الواجهة الأمامية - لوحة الإدارة ([frontend/src/admin/Admin.jsx](file:///d:/PortfolioDA/frontend/src/admin/Admin.jsx)):**
+   - استبدال `CrudEditor` الخاص بتبويب `sections` بمكون `SectionsEditor`:
+     - القائمة الجانبية للأقسام (إضافة، اختيار، حذف بتأكيد من خطوتين كما في باقي التبويبات).
+     - نموذج القسم المختار (`titleAr`, `titleEn`, `order` وزر حفظ).
+     - شريط أزرار الإضافة للبلوكات السبعة: `+ عنوان`, `+ نص`, `+ رابط`, `+ زر`, `+ صورة`, `+ معرض صور`, `+ ملف`.
+     - بطاقة لكل بلوك تحتوي:
+       - شارة النوع (Badge)، مقبض السحب (`⠿`)، أزرار تقديم وتأخير (`↑` و `↓`)، زر حذف بتأكيد من خطوتين، حقول النوع المخصص، زر "حفظ"، ومؤشر "تعديلات غير محفوظة".
+       - زر (BUTTON): عينات ألوان (`#6fd0ff`, `#7b8cff`, `#4ade80`, `#f5c26b`, `#ff8a8a`, `#e8edf8`) + منتقي لون أصلي `<input type="color">` ومعاينة حية للزر.
+       - رفع الصور والملفات عبر `api.upload` الحالي مع إمكانية إضافة عدة صور للمعرض وحذف الفردية، وعرض اسم وحجم الملف.
+     - إعادة الترتيب: دعم السحب والإفلات الأصلي (HTML5 Drag and drop مع مؤشر مكان الإسقاط) + أزرار الأسهم (`↑`/`↓`)، وتحديث الواجهة فورياً واستدعاء مسار `reorder` مع التراجع وإظهار خطأ في حال الفشل.
+
+2. **الواجهة الأمامية - الصفحة الرئيسية والأنماط ([Home.jsx](file:///d:/PortfolioDA/frontend/src/pages/Home.jsx) و [styles.css](file:///d:/PortfolioDA/frontend/src/styles.css)):**
+   - في [Home.jsx](file:///d:/PortfolioDA/frontend/src/pages/Home.jsx):
+     - عرض الأقسام الإضافية بعد قسم التواصل داخل حاوية `.blocks` (بعرض أقصى 760px في المنتصف، وفجوة 16px).
+     - تمثيل كل نوع بلوك:
+       - `HEADING`: وسم `<h2>` أو `<h3>` حسب المستوى.
+       - `TEXT`: فقرة مع `white-space: pre-wrap` ومحاذاة للبداية.
+       - `LINK`: رابط عادي مع أيقونة سهم SVG مضمنة يفتح في تبويب جديد.
+       - `BUTTON`: رابط بشكل زر باللون المختار مع حساب تباين النص تلقائياً (أبيض أو أسود حسب Luminance وفق WCAG).
+       - `IMAGE`: وسم `<figure>` مع صورة متجاوبة دائرية الحواف و `<figcaption>`.
+       - `GALLERY`: شبكة متجاوبة (min 200px) تفتح الصور بالحجم الكامل في تبويب جديد.
+       - `FILE`: بطاقة زجاجية مع أيقونة ملف SVG، العنوان (أو اسم الملف كبديل)، الحجم (KB/MB)، ورابط تنزيل (`download`).
+   - في [styles.css](file:///d:/PortfolioDA/frontend/src/styles.css):
+     - إصلاح بطاقات التواصل لمنع كسر الإيميل:
+       تطبيق `grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));` على `.contacts`، واستخدام `overflow-wrap: break-word` و `word-break: normal` للقيمة.
+     - إضافة تنسيقات `.blocks` وأنماط بطاقات البلوكات ومؤشر السحب في لوحة الإدارة.
+
+3. **التحقق والاختبار (Verification):**
+   - التحقق من نجاح `npm run build` للباك إند والفرونت إند.
+   - اختبارات API باستخدام توكن الأدمن الحقيقي (إنشاء الأنواع الـ 7، فحص رفض الروابط الضارة والألوان غير الصحيحة بـ 400، فحص حماية المسارات بـ 401، فحص إعادة الترتيب وإخفاء الأقسام الفارغة في `/api/public`).
+   - تشغيل المتصفح والتحقق من الترتيب، السحب، الألوان، التنزيل والتجاوب على قياسي 400px و 1280px باللغتين العربية والإنجليزية.
+
+---
+
+### 3. ملاحظة تقنية للاستئناف السريع (Dev Note)
+- محرك قاعدة البيانات PostgreSQL 18 قيد التشغيل على المنفذ `5432`.
+- إذا احتجت تشغيل `npx prisma generate` وظهر خطأ `EPERM` لملف الـ DLL، يكفي إيقاف أي عملية Node مشغلة للباك إند بالخلفية وسيعمل فوراً.
+- جميع المتطلبات محددة بدقة دون الحاجة لأي مكتبات npm خارجية جديدة.

@@ -1,5 +1,5 @@
 import {
-  BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, ParseIntPipe,
+  BadRequestException, Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, ParseIntPipe,
   Post, Put, UploadedFile, UseGuards, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -17,8 +17,8 @@ const BLOCKED_EXT = new Set(['.html', '.htm', '.js', '.mjs', '.php', '.svg']);
 const WORK_TYPES = ['WEB', 'MOBILE', 'DESKTOP', 'OTHER'];
 
 // Fields the admin may write for each resource. Anything else in the body is dropped.
+// sections is handled by dedicated routes; keep it out of the generic CRUD.
 const RESOURCES: Record<string, { model: string; fields: string[]; ints: string[]; json: string[] }> = {
-  sections: { model: 'section', fields: ['titleAr', 'titleEn', 'bodyAr', 'bodyEn', 'order'], ints: ['order'], json: [] },
   works: {
     model: 'work',
     fields: [
@@ -58,6 +58,64 @@ function checkUrl(value: string, field: string) {
   if (value && !/^(https?:\/\/|\/uploads\/|tel:|mailto:)/i.test(value)) {
     throw new BadRequestException(`${field} must start with http(s)://`);
   }
+}
+
+// ── Block types whitelist ────────────────────────────────────────────
+const BLOCK_TYPES = ['HEADING', 'TEXT', 'LINK', 'BUTTON', 'IMAGE', 'GALLERY', 'FILE'] as const;
+type BlockType = (typeof BLOCK_TYPES)[number];
+
+function validateBlockData(type: BlockType, raw: any): Record<string, any> {
+  const d: Record<string, any> = {};
+  const str = (v: any, max = 5000) => {
+    if (v === undefined || v === null) return '';
+    if (typeof v !== 'string') throw new BadRequestException('text field must be a string');
+    return v.slice(0, max);
+  };
+  const urlField = (v: any, field: string, allowUploads = true, extraOk?: RegExp) => {
+    const s = str(v, 2000);
+    if (!s) return s;
+    const base = allowUploads ? /^(https?:\/\/|\/uploads\/)/ : /^https?:\/\//;
+    const ok = base.test(s) || (extraOk ? extraOk.test(s) : false);
+    if (!ok) throw new BadRequestException(`${field} has an invalid URL`);
+    return s;
+  };
+  if (type === 'HEADING') {
+    d.textAr = str(raw.textAr);
+    d.textEn = str(raw.textEn);
+    const lv = Number(raw.level);
+    d.level = lv === 2 ? 2 : 3;
+  } else if (type === 'TEXT') {
+    d.textAr = str(raw.textAr);
+    d.textEn = str(raw.textEn);
+  } else if (type === 'LINK') {
+    d.titleAr = str(raw.titleAr);
+    d.titleEn = str(raw.titleEn);
+    d.url = urlField(raw.url, 'url', true, /^(tel:|mailto:)/i);
+  } else if (type === 'BUTTON') {
+    d.labelAr = str(raw.labelAr);
+    d.labelEn = str(raw.labelEn);
+    d.url = urlField(raw.url, 'url', true, /^(tel:|mailto:)/i);
+    const color = str(raw.color, 20);
+    if (color && !/^#[0-9a-fA-F]{6}$/.test(color)) throw new BadRequestException('color must be #RRGGBB');
+    d.color = color;
+  } else if (type === 'IMAGE') {
+    d.url = urlField(raw.url, 'url', true);
+    d.captionAr = str(raw.captionAr);
+    d.captionEn = str(raw.captionEn);
+  } else if (type === 'GALLERY') {
+    if (!Array.isArray(raw.images)) throw new BadRequestException('images must be an array');
+    if (raw.images.length > 30) throw new BadRequestException('max 30 images');
+    d.images = raw.images.map((u: any, i: number) => urlField(u, `images[${i}]`, true));
+  } else if (type === 'FILE') {
+    const url = str(raw.url, 500);
+    if (url && !url.startsWith('/uploads/')) throw new BadRequestException('FILE url must start with /uploads/');
+    d.url = url;
+    d.titleAr = str(raw.titleAr);
+    d.titleEn = str(raw.titleEn);
+    d.name = str(raw.name, 500);
+    d.size = Number(raw.size) || 0;
+  }
+  return d;
 }
 
 @UseGuards(JwtAuthGuard)
@@ -126,6 +184,98 @@ export class AdminController {
     };
   }
 
+  // ---------- sections with blocks (declared BEFORE :resource routes to avoid conflict)
+
+  @Get('sections')
+  async listSections() {
+    return this.prisma.section.findMany({
+      orderBy: [{ order: 'asc' }, { id: 'asc' }],
+      include: { blocks: { orderBy: [{ order: 'asc' }, { id: 'asc' }] } },
+    });
+  }
+
+  @Post('sections')
+  createSection(@Body() body: any) {
+    const data = pick(body, { fields: ['titleAr', 'titleEn', 'order'], ints: ['order'], json: [] });
+    return this.prisma.section.create({ data });
+  }
+
+  @Put('sections/:id')
+  async updateSection(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
+    const data = pick(body, { fields: ['titleAr', 'titleEn', 'order'], ints: ['order'], json: [] });
+    const exists = await this.prisma.section.findUnique({ where: { id } });
+    if (!exists) throw new NotFoundException();
+    return this.prisma.section.update({ where: { id }, data });
+  }
+
+  @Delete('sections/:id')
+  async removeSection(@Param('id', ParseIntPipe) id: number) {
+    await this.prisma.section.deleteMany({ where: { id } });
+    return { ok: true };
+  }
+
+  @Post('sections/:id/blocks')
+  async addBlock(
+    @Param('id', ParseIntPipe) sectionId: number,
+    @Body() body: any,
+  ) {
+    const section = await this.prisma.section.findUnique({ where: { id: sectionId } });
+    if (!section) throw new NotFoundException();
+    const type = String(body?.type || '').toUpperCase() as BlockType;
+    if (!BLOCK_TYPES.includes(type)) throw new BadRequestException('Unknown block type');
+    const data = validateBlockData(type, body?.data ?? {});
+    const agg = await this.prisma.sectionBlock.aggregate({
+      where: { sectionId },
+      _max: { order: true },
+    });
+    const nextOrder = (agg._max.order ?? -1) + 1;
+    return this.prisma.sectionBlock.create({ data: { sectionId, type, order: nextOrder, data } });
+  }
+
+  @Put('blocks/:id')
+  async updateBlock(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
+    const block = await this.prisma.sectionBlock.findUnique({ where: { id } });
+    if (!block) throw new NotFoundException();
+    const type = block.type as BlockType;
+    const data = validateBlockData(type, body?.data ?? {});
+    return this.prisma.sectionBlock.update({ where: { id }, data: { data } });
+  }
+
+  @Delete('blocks/:id')
+  @HttpCode(200)
+  async deleteBlock(@Param('id', ParseIntPipe) id: number) {
+    await this.prisma.sectionBlock.deleteMany({ where: { id } });
+    return { ok: true };
+  }
+
+  @Put('sections/:id/blocks/reorder')
+  async reorderBlocks(
+    @Param('id', ParseIntPipe) sectionId: number,
+    @Body() body: any,
+  ) {
+    if (!Array.isArray(body?.ids)) throw new BadRequestException('ids must be an array');
+    const ids: number[] = body.ids.map((x: any) => {
+      const n = Number(x);
+      if (!Number.isInteger(n)) throw new BadRequestException('ids must be integers');
+      return n;
+    });
+    // Validate: no duplicates
+    if (new Set(ids).size !== ids.length) throw new BadRequestException('duplicate ids');
+    // Validate: exactly the block ids belonging to this section
+    const existing = await this.prisma.sectionBlock.findMany({
+      where: { sectionId },
+      select: { id: true },
+    });
+    const existingSet = new Set(existing.map((b) => b.id));
+    if (ids.length !== existingSet.size || ids.some((i) => !existingSet.has(i))) {
+      throw new BadRequestException("ids must be exactly the section's block ids");
+    }
+    await this.prisma.$transaction(
+      ids.map((bid, idx) => this.prisma.sectionBlock.update({ where: { id: bid }, data: { order: idx } })),
+    );
+    return { ok: true };
+  }
+
   // ---------- downloadable files attached to a work
   @Post('works/:id/files')
   async addFile(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
@@ -147,7 +297,7 @@ export class AdminController {
     return { ok: true };
   }
 
-  // ---------- generic CRUD: sections, works, links, contacts
+  // ---------- generic CRUD: works, links, contacts
   private resource(name: string) {
     const spec = RESOURCES[name];
     if (!spec) throw new NotFoundException();

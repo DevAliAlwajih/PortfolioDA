@@ -52,14 +52,24 @@ model Profile {
   visionEn  String  @default("")
 }
 
-// Extra sections the owner adds (text blocks).
+// Extra sections the owner adds (ordered blocks).
 model Section {
-  id      Int    @id @default(autoincrement())
-  titleAr String @default("")
-  titleEn String @default("")
-  bodyAr  String @default("")
-  bodyEn  String @default("")
-  order   Int    @default(0)
+  id      Int            @id @default(autoincrement())
+  titleAr String         @default("")
+  titleEn String         @default("")
+  order   Int            @default(0)
+  blocks  SectionBlock[]
+}
+
+model SectionBlock {
+  id        Int     @id @default(autoincrement())
+  sectionId Int
+  type      String
+  order     Int     @default(0)
+  data      Json    @default("{}")
+  section   Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@index([sectionId, order])
 }
 
 model Work {

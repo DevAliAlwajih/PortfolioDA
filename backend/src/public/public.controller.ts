@@ -10,6 +10,21 @@ class ReviewDto {
   @IsString() @Length(1, 1000) comment: string;
 }
 
+/** Returns true if a block has enough content to count as "visible" */
+function blockHasContent(block: { type: string; data: any }): boolean {
+  const d = (block.data as Record<string, any>) || {};
+  switch (block.type) {
+    case 'HEADING': return !!(d.textAr || d.textEn);
+    case 'TEXT':    return !!(d.textAr || d.textEn);
+    case 'LINK':    return !!(d.url);
+    case 'BUTTON':  return !!(d.url);
+    case 'IMAGE':   return !!(d.url);
+    case 'GALLERY': return Array.isArray(d.images) && d.images.length > 0;
+    case 'FILE':    return !!(d.url);
+    default:        return false;
+  }
+}
+
 @Controller('public')
 export class PublicController {
   constructor(private readonly prisma: PrismaService) {}
@@ -17,9 +32,12 @@ export class PublicController {
   // Everything the home page needs. Review emails are never included.
   @Get()
   async home() {
-    const [profile, sections, works, links, contacts, reviews] = await Promise.all([
+    const [profile, allSections, works, links, contacts, reviews] = await Promise.all([
       this.prisma.profile.findUnique({ where: { id: 1 } }),
-      this.prisma.section.findMany({ orderBy: [{ order: 'asc' }, { id: 'asc' }] }),
+      this.prisma.section.findMany({
+        orderBy: [{ order: 'asc' }, { id: 'asc' }],
+        include: { blocks: { orderBy: [{ order: 'asc' }, { id: 'asc' }] } },
+      }),
       this.prisma.work.findMany({
         orderBy: [{ order: 'asc' }, { id: 'asc' }],
         select: {
@@ -35,6 +53,16 @@ export class PublicController {
         select: { id: true, name: true, rating: true, comment: true, createdAt: true },
       }),
     ]);
+
+    // Filter sections: must have a non-empty title AND at least one block with content.
+    // Strip empty blocks from the response too.
+    const sections = allSections
+      .map((s) => ({
+        ...s,
+        blocks: s.blocks.filter(blockHasContent),
+      }))
+      .filter((s) => (s.titleAr || s.titleEn) && s.blocks.length > 0);
+
     return { profile, sections, works, links, contacts, reviews };
   }
 
