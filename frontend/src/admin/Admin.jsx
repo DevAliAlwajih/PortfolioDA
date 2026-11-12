@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, getToken, setToken } from '../api.js';
 import { Brand, LogoPlate } from '../components/Brand.jsx';
+import './admin.css';
 
 /* ---------- small building blocks ---------- */
 
