@@ -220,6 +220,7 @@ function CrudEditor({ resource, fields, blank, titleOf, renderExtra, addLabel })
                   </Field>
                 );
               }
+              if (fd.type === 'checkbox') return <Field key={fd.key} label={fd.label}><input type="checkbox" checked={!!form[fd.key]} onChange={(e) => setForm({ ...form, [fd.key]: e.target.checked })} /></Field>;
               if (fd.type === 'textarea') return <Field key={fd.key} label={fd.label}><textarea rows={fd.rows || 4} dir={fd.ltr ? 'ltr' : undefined} value={form[fd.key]} onChange={set(fd.key)} /></Field>;
               return <Field key={fd.key} label={fd.label} hint={fd.hint}><input type={fd.type === 'number' ? 'number' : 'text'} dir={fd.ltr ? 'ltr' : undefined} value={form[fd.key]} onChange={set(fd.key)} /></Field>;
             })}
@@ -427,6 +428,7 @@ const WORK_FIELDS = [
   { key: 'imageUrl', label: 'الصورة', type: 'image' },
   { key: 'version', label: 'الإصدار', ltr: true },
   { key: 'summaryAr', label: 'شرح مختصر (عربي)', type: 'textarea', rows: 3 },
+  { key: 'featured', label: 'عمل مميز (يظهر في عارض الرئيسية)', type: 'checkbox' },
   { key: 'summaryEn', label: 'Short description (English)', type: 'textarea', rows: 3, ltr: true },
   { key: 'link', label: 'الرابط (يظهر زر "فتح الرابط")', ltr: true, hint: 'يجب أن يبدأ بـ https://' },
   { key: 'introAr', label: 'تعريف بالنظام (عربي)', type: 'textarea', rows: 5 },
@@ -695,7 +697,7 @@ export default function Admin() {
             resource="works"
             addLabel="+ إضافة عمل أو تطبيق"
             titleOf={(w) => w.titleAr || w.titleEn}
-            blank={{ type: 'WEB', titleAr: '', titleEn: '', imageUrl: '', version: '', summaryAr: '', summaryEn: '', link: '', introAr: '', introEn: '', policyAr: '', policyEn: '', steps: [], gallery: [], order: 0, files: [] }}
+            blank={{ type: 'WEB', titleAr: '', titleEn: '', imageUrl: '', version: '', summaryAr: '', summaryEn: '', link: '', introAr: '', introEn: '', policyAr: '', policyEn: '', steps: [], gallery: [], order: 0, featured: false, files: [] }}
             fields={WORK_FIELDS}
             renderExtra={(p) => <WorkExtras {...p} />}
           />

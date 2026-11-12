@@ -1,0 +1,1 @@
+export const heroPhrases = { ar: ['مطور ويب شامل', 'NestJS · React · PostgreSQL', 'منصة التطوير الرقمي'], en: ['Full Stack Web Developer', 'NestJS · React · PostgreSQL', 'Digital development platform'] };

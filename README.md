@@ -2,6 +2,10 @@
 
 NestJS + Prisma + PostgreSQL backend, React (Vite) frontend.
 
+## Site structure and animations
+
+The public site is an app shell: each route renders inside a central scrolling stage while the dock follows the admin layout. Hero copy and technology labels live in `frontend/src/config/hero.js` and `frontend/src/config/tech.js`. Motion follows the operating-system Reduce Motion preference, which disables carousel and decorative animations.
+
 ## Run locally
 
 ```bash
@@ -95,4 +99,3 @@ set NEW_ADMIN_PASSWORD=
 ## Change the background image
 
 To change the site background, replace `frontend/public/site-bg.png` with another image using the same file name. The shading is controlled by the `--bg-overlay` variable in `frontend/src/styles.css` (from `0` for no shading to `1` for fully dark).
-

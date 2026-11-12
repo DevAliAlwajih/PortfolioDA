@@ -1,0 +1,1 @@
+ALTER TABLE "Work" ADD COLUMN "featured" BOOLEAN NOT NULL DEFAULT false;

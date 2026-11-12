@@ -43,7 +43,7 @@ export class PublicController {
         orderBy: [{ order: 'asc' }, { id: 'asc' }],
         select: {
           id: true, type: true, titleAr: true, titleEn: true, version: true,
-          summaryAr: true, summaryEn: true, imageUrl: true, link: true,
+          summaryAr: true, summaryEn: true, imageUrl: true, link: true, featured: true,
         },
       }),
       this.prisma.link.findMany({ orderBy: [{ order: 'asc' }, { id: 'asc' }] }),

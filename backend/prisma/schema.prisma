@@ -95,6 +95,7 @@ model Work {
   steps     Json       @default("[]")
   gallery   Json       @default("[]")
   order     Int        @default(0)
+  featured  Boolean    @default(false)
   files     WorkFile[]
 }
 

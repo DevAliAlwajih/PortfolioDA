@@ -19,27 +19,31 @@ const WORK_TYPES = ['WEB', 'MOBILE', 'DESKTOP', 'OTHER'];
 
 // Fields the admin may write for each resource. Anything else in the body is dropped.
 // sections is handled by dedicated routes; keep it out of the generic CRUD.
-const RESOURCES: Record<string, { model: string; fields: string[]; ints: string[]; json: string[] }> = {
+const RESOURCES: Record<string, { model: string; fields: string[]; ints: string[]; json: string[]; booleans?: string[] }> = {
   works: {
     model: 'work',
     fields: [
       'type', 'titleAr', 'titleEn', 'version', 'summaryAr', 'summaryEn', 'imageUrl', 'link',
-      'introAr', 'introEn', 'policyAr', 'policyEn', 'steps', 'gallery', 'order',
+      'introAr', 'introEn', 'policyAr', 'policyEn', 'steps', 'gallery', 'order', 'featured',
     ],
     ints: ['order'],
     json: ['steps', 'gallery'],
+    booleans: ['featured'],
   },
   links: { model: 'link', fields: ['title', 'url', 'order'], ints: ['order'], json: [] },
   contacts: { model: 'contact', fields: ['title', 'value', 'order'], ints: ['order'], json: [] },
 };
 const PROFILE_FIELDS = ['nameAr', 'nameEn', 'phone', 'photoUrl', 'aboutAr', 'aboutEn', 'visionAr', 'visionEn'];
 
-function pick(body: any, spec: { fields: string[]; ints?: string[]; json?: string[] }) {
+function pick(body: any, spec: { fields: string[]; ints?: string[]; json?: string[]; booleans?: string[] }) {
   const data: Record<string, any> = {};
   for (const key of spec.fields) {
     if (!(key in (body || {}))) continue;
     const v = body[key];
-    if (spec.ints?.includes(key)) {
+    if (spec.booleans?.includes(key)) {
+      if (typeof v !== 'boolean') throw new BadRequestException(`${key} must be boolean`);
+      data[key] = v;
+    } else if (spec.ints?.includes(key)) {
       const n = Number(v);
       data[key] = Number.isFinite(n) ? Math.trunc(n) : 0;
     } else if (spec.json?.includes(key)) {
