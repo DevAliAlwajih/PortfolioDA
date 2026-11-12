@@ -52,6 +52,11 @@ model Profile {
   visionEn  String  @default("")
 }
 
+model SiteSetting {
+  key   String @id
+  value Json
+}
+
 // Extra sections the owner adds (ordered blocks).
 model Section {
   id      Int            @id @default(autoincrement())

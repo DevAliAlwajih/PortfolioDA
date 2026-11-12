@@ -444,6 +444,7 @@ legend { padding-inline: 8px; color: var(--accent); font-weight: 500; }
 .drag-handle { color: var(--ink-dim); cursor: grab; font-size: 24px; line-height: 1; }
 .block-type { padding: 3px 10px; border-radius: 999px; color: var(--accent); background: rgba(111,208,255,.12); font-size: 13px; margin-inline-end: auto; }
 .color-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }.color-swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; }.color-row input[type="color"] { width: 38px; padding: 1px; height: 30px; }.block-preview { max-width: 180px; max-height: 120px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); }
+.layout-list { display: grid; gap: 10px; }.layout-card { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,.025); }.layout-card.dragging { opacity: .55; border-style: dashed; border-color: var(--accent); }.layout-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }.layout-head > span:last-of-type { display: inline-flex; gap: 6px; }.visibility { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 6px; color: var(--ink-dim); }.visibility input { width: 18px; height: 18px; accent-color: var(--accent); }
 
 @media (max-width: 760px) {
   .photo-wrap { --blob-size: 200px; }

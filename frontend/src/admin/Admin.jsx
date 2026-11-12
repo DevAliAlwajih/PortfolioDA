@@ -303,6 +303,22 @@ function SectionsEditor() {
   return <div className="crud"><aside className="crud-list"><button className="btn primary" onClick={() => setForm({ titleAr: '', titleEn: '', order: sections.length, blocks: [] })}>+ إضافة قسم</button><ul>{sections.map((s) => <li key={s.id} className={form?.id === s.id ? 'on' : ''}><button type="button" className="row-main" onClick={() => setForm(s)}>{s.titleAr || s.titleEn || `#${s.id}`}</button><Confirm onYes={() => removeSection(s.id)}>حذف</Confirm></li>)}</ul></aside><div className="crud-form">{!form ? <p className="muted">اختر قسماً أو أضف قسماً جديداً.</p> : <><form className="form" onSubmit={saveSection}><div className="two"><Field label="عنوان القسم (عربي)"><input value={form.titleAr} onChange={(e) => setForm({ ...form, titleAr: e.target.value })} /></Field><Field label="Section title (English)"><input dir="ltr" value={form.titleEn} onChange={(e) => setForm({ ...form, titleEn: e.target.value })} /></Field></div><Field label="الترتيب"><input type="number" value={form.order} onChange={(e) => setForm({ ...form, order: e.target.value })} /></Field><button className="btn primary">حفظ القسم</button></form>{form.id && <><div className="block-add">{Object.keys(BLOCK_DEFAULTS).map((type) => <button key={type} type="button" className="btn small" onClick={() => addBlock(type)}>+ {BLOCK_LABELS[type]}</button>)}</div><div className="section-blocks">{form.blocks.map((block, i) => <article key={block.id} className="section-block" draggable onDragStart={() => setDragged(i)} onDragOver={(e) => e.preventDefault()} onDrop={() => { if (dragged !== null && dragged !== i) { const next = [...form.blocks]; const [item] = next.splice(dragged, 1); next.splice(i, 0, item); reorder(next); } setDragged(null); }}><div className="block-head"><span className="drag-handle" title="اسحب لإعادة الترتيب">⠿</span><strong className="block-type">{BLOCK_LABELS[block.type]}</strong><span><button type="button" className="btn small" onClick={() => move(i, -1)} disabled={!i}>↑</button><button type="button" className="btn small" onClick={() => move(i, 1)} disabled={i === form.blocks.length - 1}>↓</button><Confirm onYes={() => removeBlock(block.id)}>حذف</Confirm></span></div>{blockFields(block)}<button type="button" className="btn primary small" onClick={() => saveBlock(block)}>حفظ البلوك</button></article>)}</div></>}</>}</div>{note}</div>;
 }
 
+function LayoutEditor() {
+  const [saved, setSaved] = useState([]);
+  const [items, setItems] = useState([]);
+  const [dragged, setDragged] = useState(null);
+  const [notify, note] = useNotice();
+  const load = useCallback(async () => { const data = await api.get('/admin/layout'); setSaved(data); setItems(data); }, []);
+  useEffect(() => { load().catch((x) => notify(x.message, true)); }, [load]);
+  const changed = JSON.stringify(saved) !== JSON.stringify(items);
+  const move = (from, to) => { if (to < 0 || to >= items.length) return; const next = [...items]; const [item] = next.splice(from, 1); next.splice(to, 0, item); setItems(next); };
+  const edit = (index, patch) => setItems(items.map((x, i) => i === index ? { ...x, ...patch } : x));
+  const save = async () => { try { const result = await api.put('/admin/layout', { items: items.map(({ key, labelAr, labelEn, visible }) => ({ key, labelAr, labelEn, visible })) }); setSaved(result); setItems(result); notify('تم الحفظ'); } catch (x) { notify(x.message, true); } };
+  const reset = () => { const builtins = ['about', 'vision', 'works', 'links', 'contact', 'reviews']; setItems([...items.filter((x) => builtins.includes(x.key)).sort((a, b) => builtins.indexOf(a.key) - builtins.indexOf(b.key)).map((x) => ({ ...x, labelAr: '', labelEn: '', visible: true })), ...items.filter((x) => !builtins.includes(x.key)).map((x) => ({ ...x, visible: true }))]); };
+  const placeholders = { about: 'من نحن', vision: 'الرؤية', works: 'الأعمال', links: 'الروابط', contact: 'التواصل', reviews: 'التقييمات' };
+  return <div className="form"><p className="muted">اسحب العناصر أو استخدم الأسهم، ثم احفظ التغييرات.</p><div className="layout-list">{items.map((item, index) => <article key={item.key} className={`layout-card ${dragged === index ? 'dragging' : ''}`} draggable onDragStart={() => setDragged(index)} onDragOver={(e) => e.preventDefault()} onDrop={() => { if (dragged !== null) move(dragged, index); setDragged(null); }}><div className="layout-head"><span className="drag-handle">⠿</span><strong className="block-type">{item.kind === 'section' ? 'قسم إضافي' : 'أساسي'}</strong><span><button type="button" className="btn small" aria-label="للأعلى" disabled={!index} onClick={() => move(index, index - 1)}>↑</button><button type="button" className="btn small" aria-label="للأسفل" disabled={index === items.length - 1} onClick={() => move(index, index + 1)}>↓</button></span><label className="visibility">ظاهر <input type="checkbox" checked={item.visible} onChange={(e) => edit(index, { visible: e.target.checked })} /></label></div><div className="two"><Field label="العنوان (عربي)"><input value={item.labelAr} placeholder={item.kind === 'builtin' ? placeholders[item.key] : ''} onChange={(e) => edit(index, { labelAr: e.target.value })} /></Field><Field label="Title (English)"><input dir="ltr" value={item.labelEn} placeholder={item.kind === 'builtin' ? item.key : ''} onChange={(e) => edit(index, { labelEn: e.target.value })} /></Field></div></article>)}</div><p className="muted">عنوان القسم الإضافي هو نفسه الموجود في تبويب أقسام إضافية.</p>{changed && <p className="warn">تعديلات غير محفوظة</p>}<div className="row-actions"><button type="button" className="btn primary" onClick={save}>حفظ الترتيب والعناوين</button><Confirm className="btn" onYes={reset}>إعادة الترتيب الافتراضي</Confirm></div>{note}</div>;
+}
+
 /* ---------- works: usage steps, screenshots, downloadable files ---------- */
 
 function WorkExtras({ form, setForm, reload, notify }) {
@@ -640,6 +656,7 @@ const TABS = [
   ['links', 'إدارة الروابط'],
   ['contacts', 'إدارة التواصل'],
   ['sections', 'أقسام إضافية'],
+  ['layout', 'القائمة والترتيب'],
   ['reviews', 'التقييمات'],
   ['account', 'الحساب'],
 ];
@@ -692,6 +709,7 @@ export default function Admin() {
             fields={[{ key: 'title', label: 'العنوان (مثل: واتساب)' }, { key: 'value', label: 'الرقم أو القيمة', ltr: true }, { key: 'order', label: 'الترتيب', type: 'number' }]} />
         )}
         {tab === 'sections' && <SectionsEditor />}
+        {tab === 'layout' && <LayoutEditor />}
         {tab === 'reviews' && <ReviewsAdmin />}
         {tab === 'account' && <Account email={me} onEmailChange={setMe} />}
       </div>

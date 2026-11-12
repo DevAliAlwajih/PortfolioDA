@@ -2,6 +2,7 @@ import { Body, Controller, Get, NotFoundException, Param, ParseIntPipe, Post } f
 import { Throttle } from '@nestjs/throttler';
 import { IsEmail, IsInt, IsString, Length, Max, Min } from 'class-validator';
 import { PrismaService } from '../common/prisma.service';
+import { resolveLayout } from '../common/layout';
 
 class ReviewDto {
   @IsString() @Length(1, 80) name: string;
@@ -63,7 +64,8 @@ export class PublicController {
       }))
       .filter((s) => (s.titleAr || s.titleEn) && s.blocks.length > 0);
 
-    return { profile, sections, works, links, contacts, reviews };
+    const layout = (await resolveLayout(this.prisma)).map(({ key, labelAr, labelEn, visible }) => ({ key, labelAr, labelEn, visible }));
+    return { profile, sections, works, links, contacts, reviews, layout };
   }
 
   @Get('works/:id')

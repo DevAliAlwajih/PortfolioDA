@@ -9,6 +9,7 @@ import { existsSync, mkdirSync, unlink } from 'fs';
 import { extname, join } from 'path';
 import { PrismaService } from '../common/prisma.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { BUILTIN_LAYOUT_KEYS, resolveLayout } from '../common/layout';
 
 const UPLOAD_DIR = join(process.cwd(), 'uploads');
 if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -125,6 +126,31 @@ export class AdminController {
 
   private db(model: string): any {
     return (this.prisma as any)[model];
+  }
+
+  // ---------- site navigation and section layout (before generic :resource routes)
+  @Get('layout')
+  layout() {
+    return resolveLayout(this.prisma);
+  }
+
+  @Put('layout')
+  async saveLayout(@Body() body: any) {
+    if (!Array.isArray(body?.items)) throw new BadRequestException('items must be an array');
+    const current = await resolveLayout(this.prisma);
+    const expected = new Set(current.map((x) => x.key));
+    const items = body.items.map((raw: any) => {
+      if (!raw || typeof raw.key !== 'string' || !/^(about|vision|works|links|contact|reviews|sec-\d+)$/.test(raw.key)) throw new BadRequestException('invalid layout key');
+      if (typeof raw.labelAr !== 'string' || typeof raw.labelEn !== 'string' || raw.labelAr.length > 60 || raw.labelEn.length > 60) throw new BadRequestException('labels must be text up to 60 characters');
+      if (typeof raw.visible !== 'boolean') throw new BadRequestException('visible must be boolean');
+      return { key: raw.key, labelAr: raw.labelAr, labelEn: raw.labelEn, visible: raw.visible };
+    });
+    if (new Set(items.map((x: any) => x.key)).size !== items.length || items.length !== expected.size || items.some((x: any) => !expected.has(x.key))) throw new BadRequestException('items must exactly match the current layout');
+    await this.prisma.$transaction(async (tx) => {
+      await tx.siteSetting.upsert({ where: { key: 'layout' }, create: { key: 'layout', value: items.map((x: any) => ({ ...x, labelAr: BUILTIN_LAYOUT_KEYS.includes(x.key) ? x.labelAr : '', labelEn: BUILTIN_LAYOUT_KEYS.includes(x.key) ? x.labelEn : '' })) }, update: { value: items.map((x: any) => ({ ...x, labelAr: BUILTIN_LAYOUT_KEYS.includes(x.key) ? x.labelAr : '', labelEn: BUILTIN_LAYOUT_KEYS.includes(x.key) ? x.labelEn : '' })) } });
+      await Promise.all(items.filter((x: any) => x.key.startsWith('sec-')).map((x: any, index: number) => tx.section.update({ where: { id: Number(x.key.slice(4)) }, data: { titleAr: x.labelAr, titleEn: x.labelEn, order: items.indexOf(x) } })));
+    });
+    return resolveLayout(this.prisma);
   }
 
   // ---------- profile (header, About, Vision)

@@ -166,7 +166,7 @@ export default function Home() {
   if (error) return <p className="center-note">{t('failed')}</p>;
   if (!data) return <p className="center-note">{t('loading')}</p>;
 
-  const { profile, sections, works, links, contacts, reviews } = data;
+  const { profile, sections, works, links, contacts, reviews, layout = [] } = data;
   const shown = filter === 'ALL' ? works : works.filter((w) => w.type === filter);
   const name = tr(profile, 'name');
 
@@ -176,10 +176,21 @@ export default function Home() {
     }
   };
 
-  const nav = [
-    ['about', t('about')], ['vision', t('vision')], ['works', t('works')], ['links', t('links')], ['contact', t('contact')],
-    ...sections.map((s) => [`sec-${s.id}`, tr(s, 'title')]),
-  ];
+  const defaults = { about: t('about'), vision: t('vision'), works: t('works'), links: t('links'), contact: t('contact'), reviews: t('rating') };
+  const sectionByKey = new Map(sections.map((s) => [`sec-${s.id}`, s]));
+  const shownLayout = layout.filter((item) => item.visible && (item.key === 'reviews' || item.key === 'about' || item.key === 'vision' || item.key === 'works' || (item.key === 'links' && links.length) || (item.key === 'contact' && contacts.length) || sectionByKey.has(item.key)));
+  const layoutLabel = (item) => tr(item, 'label') || defaults[item.key] || tr(sectionByKey.get(item.key), 'title');
+
+  const renderItem = (item) => {
+    const label = layoutLabel(item);
+    if (item.key === 'about') return <section key={item.key} id="about" className="centered"><h2>{label}</h2><p className="prose">{tr(profile, 'about')}</p></section>;
+    if (item.key === 'vision') return <section key={item.key} id="vision" className="centered"><h2>{label}</h2><p className="prose">{tr(profile, 'vision')}</p></section>;
+    if (item.key === 'works') return <section key={item.key} id="works"><h2>{label}</h2>{types.length > 1 && <div className="filters" role="tablist">{['ALL', ...types].map((ty) => <button key={ty} role="tab" aria-selected={filter === ty} className={filter === ty ? 'on' : ''} onClick={() => setFilter(ty)}>{ty === 'ALL' ? t('all') : t(ty.toLowerCase())}</button>)}</div>}{shown.length === 0 ? <p className="muted">{t('noWorks')}</p> : <div className="works-grid">{shown.map((w) => <WorkCard key={w.id} w={w} />)}</div>}</section>;
+    if (item.key === 'links') return <section key={item.key} id="links"><h2>{label}</h2><div className="chips">{links.map((l) => <a key={l.id} className="chip-link glass" href={l.url} target="_blank" rel="noopener noreferrer">{l.title}</a>)}</div></section>;
+    if (item.key === 'contact') return <section key={item.key} id="contact"><h2>{label}</h2><div className="contacts">{contacts.map((c) => <div key={c.id} className="glass contact-item"><span className="muted">{c.title}</span><strong dir="ltr">{c.value}</strong></div>)}</div></section>;
+    const section = sectionByKey.get(item.key);
+    return section ? <section key={item.key} id={item.key} className="centered"><h2>{label}</h2><div className="blocks">{section.blocks.map((block) => <BlockView key={block.id} block={block} />)}</div></section> : null;
+  };
 
   return (
     <div className="wrap">
@@ -213,66 +224,13 @@ export default function Home() {
       </header>
 
       <nav className="nav glass" aria-label="Sections">
-        {nav.map(([id, label]) => (
-          <a key={id} href={`#${id}`}>{label}</a>
-        ))}
-        <button type="button" onClick={openReviews}>{t('rating')}</button>
+        {shownLayout.map((item) => item.key === 'reviews'
+          ? <button key={item.key} type="button" onClick={openReviews}>{layoutLabel(item)}</button>
+          : <a key={item.key} href={`#${item.key}`}>{layoutLabel(item)}</a>)}
       </nav>
 
       <main>
-        <section id="about" className="centered">
-          <h2>{t('about')}</h2>
-          <p className="prose">{tr(profile, 'about')}</p>
-        </section>
-
-        <section id="vision" className="centered">
-          <h2>{t('vision')}</h2>
-          <p className="prose">{tr(profile, 'vision')}</p>
-        </section>
-
-        <section id="works">
-          <h2>{t('works')}</h2>
-          {types.length > 1 && (
-            <div className="filters" role="tablist">
-              {['ALL', ...types].map((ty) => (
-                <button key={ty} role="tab" aria-selected={filter === ty} className={filter === ty ? 'on' : ''} onClick={() => setFilter(ty)}>
-                  {ty === 'ALL' ? t('all') : t(ty.toLowerCase())}
-                </button>
-              ))}
-            </div>
-          )}
-          {shown.length === 0 ? <p className="muted">{t('noWorks')}</p> : <div className="works-grid">{shown.map((w) => <WorkCard key={w.id} w={w} />)}</div>}
-        </section>
-
-        {links.length > 0 && (
-          <section id="links">
-            <h2>{t('links')}</h2>
-            <div className="chips">
-              {links.map((l) => <a key={l.id} className="chip-link glass" href={l.url} target="_blank" rel="noopener noreferrer">{l.title}</a>)}
-            </div>
-          </section>
-        )}
-
-        {contacts.length > 0 && (
-          <section id="contact">
-            <h2>{t('contact')}</h2>
-            <div className="contacts">
-              {contacts.map((c) => (
-                <div key={c.id} className="glass contact-item">
-                  <span className="muted">{c.title}</span>
-                  <strong dir="ltr">{c.value}</strong>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {sections.map((s) => (
-          <section key={s.id} id={`sec-${s.id}`} className="centered">
-            <h2>{tr(s, 'title')}</h2>
-            <div className="blocks">{s.blocks.map((block) => <BlockView key={block.id} block={block} />)}</div>
-          </section>
-        ))}
+        {shownLayout.filter((item) => item.key !== 'reviews').map(renderItem)}
 
         <ReviewsSection reviews={reviews} sectionRef={reviewsSectionRef} />
       </main>
