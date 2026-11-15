@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, unlink } from 'fs';
 import { extname, join } from 'path';
 import { PrismaService } from '../common/prisma.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { BUILTIN_LAYOUT_KEYS, resolveLayout } from '../common/layout';
+import { BUILTIN_LAYOUT_KEYS, LAYOUT_ICONS, resolveLayout } from '../common/layout';
 
 const UPLOAD_DIR = join(process.cwd(), 'uploads');
 if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -147,7 +147,8 @@ export class AdminController {
       if (!raw || typeof raw.key !== 'string' || !/^(about|vision|works|links|contact|reviews|sec-\d+)$/.test(raw.key)) throw new BadRequestException('invalid layout key');
       if (typeof raw.labelAr !== 'string' || typeof raw.labelEn !== 'string' || raw.labelAr.length > 60 || raw.labelEn.length > 60) throw new BadRequestException('labels must be text up to 60 characters');
       if (typeof raw.visible !== 'boolean') throw new BadRequestException('visible must be boolean');
-      return { key: raw.key, labelAr: raw.labelAr, labelEn: raw.labelEn, visible: raw.visible };
+      if (raw.icon !== undefined && (typeof raw.icon !== 'string' || (raw.icon && !LAYOUT_ICONS.includes(raw.icon)))) throw new BadRequestException('invalid layout icon');
+      return { key: raw.key, labelAr: raw.labelAr, labelEn: raw.labelEn, visible: raw.visible, icon: raw.icon || '' };
     });
     if (new Set(items.map((x: any) => x.key)).size !== items.length || items.length !== expected.size || items.some((x: any) => !expected.has(x.key))) throw new BadRequestException('items must exactly match the current layout');
     await this.prisma.$transaction(async (tx) => {

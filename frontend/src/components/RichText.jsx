@@ -1,0 +1,7 @@
+const inline = (text, key) => text.split(/(\*\*[^*]+\*\*|`[^`]+`|https?:\/\/[^\s]+)/g).filter(Boolean).map((part,i) => {
+  if (/^\*\*.*\*\*$/.test(part)) return <strong key={`${key}-${i}`}>{part.slice(2,-2)}</strong>;
+  if (/^`.*`$/.test(part)) return <code key={`${key}-${i}`}>{part.slice(1,-1)}</code>;
+  if (/^https?:\/\//.test(part)) return <a key={`${key}-${i}`} href={part} target="_blank" rel="noopener noreferrer">{part}</a>;
+  return part;
+});
+export function RichText({ text='' }) { const lines=String(text).split('\n'); const out=[]; let buf=[]; let list=null; const flush=()=>{if(buf.length){out.push(<p key={out.length}>{buf.map((x,i)=><span key={i}>{inline(x,`${out.length}-${i}`)}{i<buf.length-1&&<br/>}</span>)}</p>);buf=[];}if(list){const Tag=list.kind;out.push(<Tag key={out.length}>{list.items.map((x,i)=><li key={i}>{inline(x,`${out.length}-${i}`)}</li>)}</Tag>);list=null;}}; lines.forEach(line=>{let m=line.match(/^(#{1,2})\s+(.*)/);if(m){flush();const Tag=m[1]==='#'?'h3':'h4';out.push(<Tag key={out.length}>{inline(m[2],out.length)}</Tag>);return}m=line.match(/^([-*])\s+(.*)/)||line.match(/^\d+\.\s+(.*)/);if(m){flush();const kind=line.match(/^\d+\./)?'ol':'ul';const value=m[m.length-1];if(!list||list.kind!==kind){flush();list={kind,items:[]}}list.items.push(value);return}if(!line.trim()){flush();return}buf.push(line)});flush();return <div className="rich-text" dir="auto">{out}</div> }

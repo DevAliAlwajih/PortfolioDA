@@ -1,10 +1,11 @@
 import { PrismaService } from './prisma.service';
 
 export const BUILTIN_LAYOUT_KEYS = ['about', 'vision', 'works', 'links', 'contact', 'reviews'];
+export const LAYOUT_ICONS = ['home','user','eye','target','briefcase','code','link','mail','phone','star','folder','layers','grid','book','globe','map-pin','file','image','award','rocket','shield','heart'];
 const layoutKey = /^(about|vision|works|links|contact|reviews|sec-\d+)$/;
 
 export type LayoutItem = {
-  key: string; labelAr: string; labelEn: string; visible: boolean;
+  key: string; labelAr: string; labelEn: string; visible: boolean; icon: string;
   kind: 'builtin' | 'section'; sectionId?: number;
 };
 
@@ -24,12 +25,12 @@ export async function resolveLayout(prisma: PrismaService): Promise<LayoutItem[]
     if (seen.has(raw.key)) continue;
     seen.add(raw.key);
     const section = sectionByKey.get(raw.key);
-    result.push({ key: raw.key, labelAr: section ? section.titleAr : typeof raw.labelAr === 'string' ? raw.labelAr : '', labelEn: section ? section.titleEn : typeof raw.labelEn === 'string' ? raw.labelEn : '', visible: typeof raw.visible === 'boolean' ? raw.visible : true, kind: section ? 'section' : 'builtin', ...(section ? { sectionId: section.id } : {}) });
+    result.push({ key: raw.key, labelAr: section ? section.titleAr : typeof raw.labelAr === 'string' ? raw.labelAr : '', labelEn: section ? section.titleEn : typeof raw.labelEn === 'string' ? raw.labelEn : '', visible: typeof raw.visible === 'boolean' ? raw.visible : true, icon: LAYOUT_ICONS.includes(raw.icon) ? raw.icon : '', kind: section ? 'section' : 'builtin', ...(section ? { sectionId: section.id } : {}) });
   }
   for (const key of [...BUILTIN_LAYOUT_KEYS, ...sections.map((s) => `sec-${s.id}`)]) {
     if (seen.has(key)) continue;
     const section = sectionByKey.get(key);
-    result.push({ key, labelAr: section?.titleAr || '', labelEn: section?.titleEn || '', visible: true, kind: section ? 'section' : 'builtin', ...(section ? { sectionId: section.id } : {}) });
+    result.push({ key, labelAr: section?.titleAr || '', labelEn: section?.titleEn || '', visible: true, icon: '', kind: section ? 'section' : 'builtin', ...(section ? { sectionId: section.id } : {}) });
   }
   return result;
 }

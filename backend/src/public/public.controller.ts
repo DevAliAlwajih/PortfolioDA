@@ -64,7 +64,7 @@ export class PublicController {
       }))
       .filter((s) => (s.titleAr || s.titleEn) && s.blocks.length > 0);
 
-    const layout = (await resolveLayout(this.prisma)).map(({ key, labelAr, labelEn, visible }) => ({ key, labelAr, labelEn, visible }));
+    const layout = (await resolveLayout(this.prisma)).map(({ key, labelAr, labelEn, visible, icon }) => ({ key, labelAr, labelEn, visible, icon }));
     return { profile, sections, works, links, contacts, reviews, layout };
   }
 
