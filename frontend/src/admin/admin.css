@@ -403,74 +403,63 @@ section:not(.centered) .prose { margin-inline: 0; }
 /* admin */
 .admin h1 { font-size: 32px; margin-bottom: 16px; }
 
-/* ── Custom Scrollbar for Admin ── */
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+/* ── Custom Styled Scrollbar for Admin ── */
+body.admin-page {
+  overflow: hidden !important;
+  height: 100% !important;
 }
-::-webkit-scrollbar-track {
-  background: rgba(10, 15, 31, 0.7);
+
+body.admin-page #root {
+  height: 100% !important;
+  overflow: hidden !important;
 }
-::-webkit-scrollbar-thumb {
-  background: rgba(111, 208, 255, 0.35);
+
+.wrap.admin {
+  height: calc(100vh - 28px);
+  max-height: calc(100vh - 28px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+  scrollbar-width: auto;
+  scrollbar-color: var(--accent) rgba(255, 255, 255, 0.06);
+  padding-inline-end: max(18px, calc(16px + env(safe-area-inset-right, 0px)));
+  box-sizing: border-box;
+}
+
+.wrap.admin::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.wrap.admin::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
   border-radius: 999px;
-  border: 2px solid rgba(10, 15, 31, 0.6);
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(111, 208, 255, 0.65);
 }
 
-/* ── Scroll Controls (Top / Bottom Floating Buttons) ── */
-.admin-scroll-controls {
-  position: fixed;
-  inset-inline-end: 24px;
-  bottom: 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  z-index: 999;
+.wrap.admin::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--accent), var(--accent-2));
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  min-height: 48px;
 }
 
-.admin-scroll-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 1px solid var(--line);
-  background: rgba(15, 25, 48, 0.85);
-  color: var(--accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s, border-color 0.2s, color 0.2s;
+.wrap.admin::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #9fe0ff, #9bb0ff);
+  background-clip: padding-box;
 }
 
-.admin-scroll-btn:hover {
-  transform: scale(1.1);
-  background: var(--accent);
-  color: #07101e;
-  border-color: transparent;
-  box-shadow: 0 10px 28px rgba(111, 208, 255, 0.35);
+.wrap.admin::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg, #c2eeff, #bdcaff);
+  background-clip: padding-box;
 }
 
-.admin-scroll-btn:active {
-  transform: scale(0.95);
+/* Ensure admin content has padding-inline-end so nothing is hidden under scrollbar */
+.wrap.admin {
+  padding-inline-end: max(20px, calc(16px + env(safe-area-inset-right, 0px)));
 }
 
-@media (max-width: 760px) {
-  .admin-scroll-controls {
-    inset-inline-end: 14px;
-    bottom: 20px;
-    gap: 8px;
-  }
-  .admin-scroll-btn {
-    width: 38px;
-    height: 38px;
-  }
-}
 .auth { max-width: 420px; margin: 8vh auto 0; padding: 28px; display: grid; gap: 16px; }
 .auth form { display: grid; gap: 12px; }
 .panel { padding: 24px; }

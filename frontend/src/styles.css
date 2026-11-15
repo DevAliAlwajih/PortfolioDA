@@ -18,13 +18,21 @@
   --border: rgba(148,189,255,.2);
   --dur: 320ms;
   --bg-overlay: .78;
+  --z-bg: 0;
+  --z-content: 1;
+  --z-header: 50;
+  --z-dock: 60;
+  --z-drawer: 100;
+  --z-modal: 200;
+  --z-lightbox: 300;
+  --z-toast: 400;
 }
 
 /* ─── Reset ─── */
 *, *:before, *:after { box-sizing: border-box }
 html, body, #root { margin: 0; width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: system-ui, sans-serif }
-body:has(.admin), body:has(.wrap.admin) { overflow-y: auto !important; height: auto !important; min-height: 100% !important; }
-#root:has(.admin), #root:has(.wrap.admin) { overflow-y: auto !important; height: auto !important; min-height: 100% !important; }
+body:has(.public) { overflow: hidden !important; height: 100% !important; min-height: 100% !important; }
+#root:has(.public) { overflow: hidden !important; height: 100% !important; min-height: 100% !important; }
 a { color: inherit; text-decoration: none }
 button, input, textarea, select { font: inherit }
 
@@ -32,7 +40,7 @@ button, input, textarea, select { font: inherit }
 .site-bg {
   position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: var(--z-bg);
   pointer-events: none;
   opacity: 1;
   background: var(--bg) url('/site-bg.png') center top / cover no-repeat;
@@ -46,17 +54,51 @@ button, input, textarea, select { font: inherit }
 
 /* ─── Shell layout (3-row grid: topbar | dock | stage) ─── */
 .public {
+  position: relative;
+  isolation: isolate;
+  min-height: 100dvh;
   height: 100dvh;
   padding: calc(12px + env(safe-area-inset-top)) 20px calc(16px + env(safe-area-inset-bottom));
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: 12px;
-  position: relative;
-  z-index: 1;
+  z-index: var(--z-content);
+  opacity: 1;
+  visibility: visible;
+}
+
+.public[data-motion="loading"] .topbar,
+.public[data-motion="loading"] .dock,
+.public[data-motion="loading"] .view,
+.public[data-motion="loading"] .hero-view,
+.public[data-motion="loading"] .hero-view > *,
+.public[data-motion="loading"] .phone-pill,
+.public[data-motion="loading"] .rating-chip,
+.public[data-motion="loading"] .showcase {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
 }
 
 /* ─── Top bar ─── */
-.topbar { max-width: 1280px; width: 100%; margin: auto; display: flex; align-items: center; justify-content: space-between }
+.topbar {
+  position: relative;
+  z-index: var(--z-header);
+  max-width: 1280px;
+  width: 100%;
+  margin: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  opacity: 1;
+  visibility: visible;
+}
+.topbar > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .brand { display: flex; align-items: center; gap: 9px }
 .brand-emblem { width: 42px }
 .brand-text { display: grid }
@@ -71,8 +113,36 @@ button, input, textarea, select { font: inherit }
   border-radius: 12px;
   cursor: pointer;
 }
-.lang { padding: 8px; margin-inline-start: 6px; font-size: 14px; min-height: 40px }
-.btn { display: inline-flex; padding: 10px 15px; margin: 4px; min-height: 42px; align-items: center }
+.lang {
+  padding: 9px 18px;
+  margin-inline-start: 0;
+  font-size: 14px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: var(--text);
+  opacity: 1;
+  visibility: visible;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 20px;
+  margin: 4px;
+  min-height: 46px;
+  min-width: 140px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  opacity: 1;
+  visibility: visible;
+  box-shadow: 0 10px 24px rgba(111, 208, 255, 0.18);
+}
 .primary, .filters .on {
   background: linear-gradient(120deg, var(--accent), var(--accent-2)) !important;
   color: #07101e !important;
@@ -82,6 +152,8 @@ button, input, textarea, select { font: inherit }
 
 /* ─── Dock ─── */
 .dock {
+  position: relative;
+  z-index: var(--z-dock);
   display: flex;
   justify-content: center;
   gap: 5px;
@@ -143,27 +215,68 @@ p  { line-height: 1.8 }
 .view > section > h1 { font-size: clamp(32px, 4vw, 52px) }
 
 /* ─── Hero ─── */
+.home-layout {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
 .hero-view {
   min-height: min(56vh, 560px);
   display: grid;
-  grid-template-columns: 1fr 1.25fr;
+  grid-template-columns: minmax(220px, 360px) minmax(0, 1fr);
   align-items: center;
   gap: clamp(24px, 6vw, 80px);
   padding: 25px;
 }
-.hero-view h1 { font-size: clamp(44px, 6vw, 84px) }
-.typing { height: 2rem; color: var(--accent); font-size: clamp(20px, 2.4vw, 30px) }
-.hero-actions .btn { font-size: 16px; min-height: 48px }
+.hero-view > div:last-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+.hero-view h1 {
+  font-size: clamp(44px, 6vw, 84px);
+  margin: 0;
+  line-height: 0.98;
+  max-width: 12ch;
+}
+.typing {
+  height: auto;
+  min-height: 2.5rem;
+  color: var(--accent);
+  font-size: clamp(20px, 2.4vw, 30px);
+  margin: 0;
+}
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  width: fit-content;
+  align-items: center;
+}
+.hero-actions .btn {
+  font-size: 16px;
+  min-height: 48px;
+  min-width: 140px;
+  padding-inline: 20px;
+}
 .phone-pill, .rating-chip {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 9px 13px;
   border: 1px solid var(--border);
   border-radius: 99px;
   background: var(--glass);
   color: var(--text);
   font-size: 19px;
+  opacity: 1;
+  visibility: visible;
 }
-.rating-chip { display: block; margin-top: 6px; cursor: pointer }
+.rating-chip { display: inline-flex; margin-top: 0; cursor: pointer }
 
 /* ─── Portrait ring ─── */
 .portrait-ring {
@@ -289,7 +402,13 @@ p  { line-height: 1.8 }
   .dock a, .dock button { min-width: 62px; flex-direction: column; font-size: 10px; padding: 5px; scroll-snap-align: center }
   .stage { grid-row: 2 }
   .hero-view, .showcase { grid-template-columns: 1fr; text-align: center }
-  .hero-view { padding: 10px; min-height: 0 }
+  .hero-view {
+    padding: 10px;
+    min-height: 0;
+  }
+  .hero-view > div:last-child {
+    align-items: center;
+  }
   .portrait-ring { width: min(55vw, 240px) }
   .showcase { padding: 15px }
   .drawer-backdrop { align-items: flex-end }

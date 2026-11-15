@@ -364,6 +364,17 @@ export default function App() {
     document.title = loc.pathname.startsWith('/admin') ? 'الإدارة | Dev.AliAlwajih' : 'Dev.AliAlwajih';
   }, [loc.pathname]);
 
+  useEffect(() => {
+    if (loc.pathname.startsWith('/admin')) return undefined;
+    const shell = document.querySelector('.public');
+    if (!shell) return undefined;
+    shell.dataset.motion = 'loading';
+    const timer = setTimeout(() => {
+      shell.dataset.motion = 'done';
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [loc.pathname]);
+
   if (loc.pathname.startsWith('/admin'))
     return (
       <Suspense fallback={<main className="loading"><div className="skeleton" /></main>}>
@@ -391,7 +402,7 @@ export default function App() {
   const label = x => tr(x, 'label') || fallback[x.key] || tr(sec.get(x.key), 'title');
 
   return (
-    <div className="public" data-fx-off={fxOffLabel || undefined} {...(debug ? { 'data-debug': '' } : {})}>
+    <div className="public" data-fx-off={fxOffLabel || undefined} data-motion="loading" {...(debug ? { 'data-debug': '' } : {})}>
       <SiteBackground />
       {fxOffLabel && <output className="fx-off" aria-live="polite">FX off: {fxOffLabel}</output>}
       <a className="skip" href="#stage">Skip to content</a>

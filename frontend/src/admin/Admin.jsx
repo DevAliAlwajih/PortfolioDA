@@ -6,62 +6,6 @@ import './admin.css';
 
 /* ---------- small building blocks ---------- */
 
-function ScrollControls() {
-  const [canScroll, setCanScroll] = useState(false);
-
-  useEffect(() => {
-    const checkScroll = () => {
-      const scrollable = document.documentElement.scrollHeight > window.innerHeight + 60;
-      setCanScroll(scrollable);
-    };
-    checkScroll();
-    window.addEventListener('resize', checkScroll);
-    const obs = new MutationObserver(checkScroll);
-    obs.observe(document.body, { childList: true, subtree: true });
-    return () => {
-      window.removeEventListener('resize', checkScroll);
-      obs.disconnect();
-    };
-  }, []);
-
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const scrollToBottom = () => {
-    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
-  };
-
-  if (!canScroll) return null;
-
-  return (
-    <aside className="admin-scroll-controls" aria-label="أزرار التمرير السريع">
-      <button
-        type="button"
-        className="admin-scroll-btn"
-        onClick={scrollToTop}
-        title="تمرير لأعلى الصفحة"
-        aria-label="تمرير لأعلى الصفحة"
-      >
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="18 15 12 9 6 15" />
-        </svg>
-      </button>
-      <button
-        type="button"
-        className="admin-scroll-btn"
-        onClick={scrollToBottom}
-        title="تمرير لأسفل الصفحة"
-        aria-label="تمرير لأسفل الصفحة"
-      >
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-    </aside>
-  );
-}
-
 function Field({ label, children, hint }) {
   return (
     <label className="field">
@@ -772,7 +716,6 @@ export default function Admin() {
         {tab === 'reviews' && <ReviewsAdmin />}
         {tab === 'account' && <Account email={me} onEmailChange={setMe} />}
       </div>
-      <ScrollControls />
     </div>
   );
 }
