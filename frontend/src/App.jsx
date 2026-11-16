@@ -22,8 +22,17 @@ class ErrorBoundary extends Component {
     this.state = { error: null };
   }
   static getDerivedStateFromError(error) { return { error }; }
+  componentDidUpdate(prevProps) {
+    if (this.state.error && prevProps.resetKey !== this.props.resetKey) {
+      this.setState({ error: null });
+    }
+  }
   componentDidCatch(error, info) {
-    console.error('[ErrorBoundary]', this.props.label || '', error, info.componentStack);
+    console.error('[ErrorBoundary]', this.props.label || '', {
+      message: error?.message,
+      stack: error?.stack,
+      componentStack: info?.componentStack,
+    });
   }
   render() {
     if (this.state.error) {
@@ -32,7 +41,16 @@ class ErrorBoundary extends Component {
           <strong>{this.props.label || 'Section'} crashed:</strong>{' '}
           <code style={{ fontSize: 13 }}>{String(this.state.error)}</code>
           <br />
-          <button className="btn" style={{ marginTop: 8 }} onClick={() => this.setState({ error: null })}>Retry</button>
+          <button
+            className="btn"
+            style={{ marginTop: 8 }}
+            onClick={() => {
+              this.setState({ error: null });
+              this.props.onRetry?.();
+            }}
+          >
+            Retry
+          </button>
         </div>
       );
     }
@@ -185,6 +203,7 @@ function View({ data, open }) {
   const [workMode, setWorkMode] = useState(() => { try { return localStorage.getItem('works-mode') || 'grid'; } catch { return 'grid'; } });
   const [detail, setDetail] = useState();
   const [lightbox, setLightbox] = useState(null);
+  const [sectionProgress, setSectionProgress] = useState(0);
 
   // Scroll position management:
   // - Opening /works/:id must start at scrollTop 0 for every scrollable ancestor
@@ -228,6 +247,24 @@ function View({ data, open }) {
   }, [page, detail, tr]);
   useEffect(() => { const timer = setTimeout(() => setSearch(query), 180); return () => clearTimeout(timer); }, [query]);
   useEffect(() => { try { localStorage.setItem('works-mode', workMode); } catch {} }, [workMode]);
+
+  useEffect(() => {
+    if (!pathname.startsWith('/s/')) {
+      setSectionProgress(0);
+      return undefined;
+    }
+
+    const stage = document.querySelector('.stage');
+    if (!stage) return undefined;
+    const onScroll = () => {
+      const maxScroll = stage.scrollHeight - stage.clientHeight;
+      const value = maxScroll > 0 ? (stage.scrollTop / maxScroll) * 100 : 0;
+      setSectionProgress(Math.min(100, Math.max(0, value)));
+    };
+    onScroll();
+    stage.addEventListener('scroll', onScroll, { passive: true });
+    return () => stage.removeEventListener('scroll', onScroll);
+  }, [pathname, sectionId]);
 
   if (page === 'home') return <Hero data={data} open={open} />;
 
@@ -300,12 +337,47 @@ function View({ data, open }) {
 
   if (pathname.startsWith('/s/')) {
     const s = data.sections.find(x => String(x.id) === sectionId);
-    return s ? (
-      <section>
-        <h1>{tr(s, 'title')}</h1>
-        <Blocks blocks={s.blocks} />
-      </section>
-    ) : <section className="center-view"><h1>{t('notFound')}</h1><Link className="btn" to="/">{t('back')}</Link></section>;
+    if (!s) return <section className="center-view"><h1>{t('notFound')}</h1><Link className="btn" to="/">{t('back')}</Link></section>;
+
+    const headingBlocks = s.blocks.filter((b) => b.type === 'HEADING');
+    const toc = headingBlocks
+      .map((b) => ({ id: `section-block-${b.id}`, label: tr(b.data || {}, 'text') }))
+      .filter((item) => item.label);
+
+    return (
+      <article className="section-page" aria-labelledby="section-title">
+        <div className="section-progress" aria-hidden="true">
+          <span style={{ width: `${sectionProgress}%` }} />
+        </div>
+
+        <div className="section-breadcrumb">
+          <Link to="/">{t('home')}</Link>
+          <span aria-hidden="true">/</span>
+          <span>{tr(s, 'title')}</span>
+        </div>
+
+        <div className="section-layout">
+          <aside className="section-toc">
+            <p className="section-toc-label">Contents</p>
+            <nav aria-label="Section table of contents">
+              {toc.length ? toc.map((item) => (
+                <a key={item.id} href={`#${item.id}`}>
+                  {item.label}
+                </a>
+              )) : <a href="#section-top">Overview</a>}
+            </nav>
+          </aside>
+
+          <div className="section-main" id="section-top">
+            <header className="section-header">
+              <p className="section-kicker">{t('works')}</p>
+              <h1 id="section-title">{tr(s, 'title')}</h1>
+            </header>
+            <Blocks blocks={s.blocks} />
+          </div>
+        </div>
+      </article>
+    );
   }
 
   if (page === 'detail') {
@@ -322,6 +394,15 @@ export default function App() {
   const [data, setData] = useState();
   const [failed, setFailed] = useState(false);
   const [drawer, setDrawer] = useState(false);
+  const [stageKey, setStageKey] = useState(0);
+
+  const refreshPublic = () => {
+    setFailed(false);
+    setData(undefined);
+    if (!loc.pathname.startsWith('/admin')) {
+      api.get('/public').then(setData).catch(() => setFailed(true));
+    }
+  };
 
   useEffect(() => {
     const admin = loc.pathname.startsWith('/admin');
@@ -333,8 +414,12 @@ export default function App() {
   const debug = new URLSearchParams(loc.search).get('debug') === '1';
 
   useEffect(() => {
-    if (!loc.pathname.startsWith('/admin'))
-      api.get('/public').then(setData).catch(() => setFailed(true));
+    if (!loc.pathname.startsWith('/admin')) refreshPublic();
+  }, [loc.pathname]);
+
+  useEffect(() => {
+    if (loc.pathname.startsWith('/admin')) return;
+    setStageKey((value) => value + 1);
   }, [loc.pathname]);
 
   useEffect(() => {
@@ -428,7 +513,15 @@ export default function App() {
 
       <main className="stage" id="stage" tabIndex="-1">
         <div className="view">
-          <ErrorBoundary label="Stage">
+          <ErrorBoundary
+            key={stageKey}
+            label="Stage"
+            resetKey={stageKey}
+            onRetry={() => {
+              setStageKey((value) => value + 1);
+              refreshPublic();
+            }}
+          >
             <View data={data} open={() => setDrawer(true)} />
           </ErrorBoundary>
         </div>
