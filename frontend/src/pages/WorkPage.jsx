@@ -10,7 +10,7 @@ const fmtSize = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math
 
 export default function WorkPage({ work: propWork, onBack }) {
   const params = useParams();
-  const id = propWork?.id || params.id;
+  const id = propWork?.id ?? params?.id ?? null;
   const { t, tr, lang } = useLang();
   const nav = useNavigate();
   const [w, setW] = useState(propWork || null);
@@ -37,12 +37,23 @@ export default function WorkPage({ work: propWork, onBack }) {
   useEffect(() => {
     if (propWork) {
       setW(propWork);
+      setError(false);
       return;
     }
+
+    if (!id) {
+      setW(null);
+      setError(true);
+      return;
+    }
+
     setW(null);
     setError(false);
     api.get(`/public/works/${id}`)
-      .then(setW)
+      .then((work) => {
+        setW(work);
+        setError(false);
+      })
       .catch(() => setError(true));
   }, [id, propWork]);
 

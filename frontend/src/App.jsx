@@ -123,7 +123,7 @@ function ImageLightbox({ images, index, close }) {
 }
 
 /* ─── Hero ─── */
-function Hero({ data, open }) {
+function Hero({ data, open, onVisitWork }) {
   const { tr, lang, t } = useLang();
   const nav = useNavigate();
   const [n, setN] = useState(0);
@@ -266,7 +266,7 @@ function View({ data, open }) {
     return () => stage.removeEventListener('scroll', onScroll);
   }, [pathname, sectionId]);
 
-  if (page === 'home') return <Hero data={data} open={open} />;
+  if (page === 'home') return <Hero data={data} open={open} onVisitWork={onVisitWork} />;
 
   if (page === 'about') return (
     <section className="center-view">
@@ -381,10 +381,10 @@ function View({ data, open }) {
   }
 
   if (page === 'detail') {
-    return <WorkPage work={detail} onBack={() => nav('/works')} />;
+    return <WorkPage key={detailId || 'detail'} work={detail} onBack={() => nav('/works')} />;
   }
 
-  return <Hero data={data} open={open} />;
+  return <Hero data={data} open={open} onVisitWork={onVisitWork} />;
 }
 
 /* ─── App root ─── */

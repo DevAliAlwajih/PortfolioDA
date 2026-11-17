@@ -1,20 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useLang } from '../i18n.jsx';
 
-/**
- * Accessible Lightbox Component
- * Features:
- * - Zoom in / out buttons, +, -, 0 keys
- * - Mouse wheel zoom towards cursor
- * - Pinch zoom on touch
- * - Double click toggles 1x / 2x
- * - Drag to pan when scale > 1
- * - Esc closes, arrow keys navigate (mirrored in RTL)
- * - Focus trap & restore focus to previous activeElement on close
- * - Body scroll lock
- * - Image counter "X / Y"
- * - Close button & backdrop click (when scale === 1)
- */
 export function Lightbox({ images = [], initialIndex = 0, onClose }) {
   const { lang } = useLang();
   const isRtl = lang === 'ar' || document.documentElement.dir === 'rtl';
@@ -28,20 +15,54 @@ export function Lightbox({ images = [], initialIndex = 0, onClose }) {
   const containerRef = useRef(null);
   const prevFocusRef = useRef(null);
   const touchStartRef = useRef({ dist: 0, scale: 1 });
+  const portalRootRef = useRef(null);
 
-  // Save previous activeElement to restore focus
   useEffect(() => {
     prevFocusRef.current = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    const previousPosition = document.body.style.position;
+    const previousTop = document.body.style.top;
+    const scrollY = window.scrollY;
+
     document.body.classList.add('lightbox-open');
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+
+    const root = document.createElement('div');
+    root.setAttribute('data-lightbox-root', 'true');
+    document.body.appendChild(root);
+    portalRootRef.current = root;
+
+    const markerUrl = new URL(window.location.href);
+    markerUrl.hash = 'lightbox-open';
+    window.history.pushState({ lightboxOpen: true }, '', markerUrl);
+
+    const handlePopState = () => {
+      if (window.location.hash !== '#lightbox-open') {
+        onClose?.();
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+
     return () => {
+      window.removeEventListener('popstate', handlePopState);
       document.body.classList.remove('lightbox-open');
+      document.body.style.overflow = previousOverflow;
+      document.body.style.position = previousPosition;
+      document.body.style.top = previousTop;
+      document.body.style.width = '';
+      if (portalRootRef.current) {
+        portalRootRef.current.remove();
+      }
       if (prevFocusRef.current && typeof prevFocusRef.current.focus === 'function') {
         prevFocusRef.current.focus();
       }
+      window.scrollTo({ top: scrollY, behavior: 'auto' });
     };
-  }, []);
+  }, [onClose]);
 
-  // Reset scale and position when changing images
   useEffect(() => {
     setScale(1);
     setPosition({ x: 0, y: 0 });
@@ -59,19 +80,18 @@ export function Lightbox({ images = [], initialIndex = 0, onClose }) {
   }, []);
 
   const nextImage = useCallback(() => {
-    setCurrentIndex((prev) => (prev + 1) % images.length);
+    setCurrentIndex((prev) => (prev + 1) % Math.max(images.length, 1));
   }, [images.length]);
 
   const prevImage = useCallback(() => {
-    setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
+    setCurrentIndex((prev) => (prev - 1 + Math.max(images.length, 1)) % Math.max(images.length, 1));
   }, [images.length]);
 
-  // Keyboard navigation & zoom
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        onClose?.();
         return;
       }
       if (e.key === '+' || e.key === '=') {
@@ -102,7 +122,6 @@ export function Lightbox({ images = [], initialIndex = 0, onClose }) {
         return;
       }
 
-      // Focus trap within container
       if (e.key === 'Tab' && containerRef.current) {
         const focusable = containerRef.current.querySelectorAll(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
@@ -125,23 +144,19 @@ export function Lightbox({ images = [], initialIndex = 0, onClose }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose, setClampedScale, isRtl, nextImage, prevImage]);
 
-  // Mouse wheel zoom towards cursor
   const handleWheel = (e) => {
     e.preventDefault();
     const delta = e.deltaY < 0 ? 0.25 : -0.25;
     setClampedScale((s) => s + delta);
   };
 
-  // Double click toggles 1x / 2x
   const handleDoubleClick = (e) => {
     e.stopPropagation();
     setClampedScale((s) => (s > 1 ? 1 : 2));
   };
 
-  // Drag to pan
   const handleMouseDown = (e) => {
-    if (scale <= 1) return;
-    if (e.button !== 0) return; // Only left click
+    if (scale <= 1 || e.button !== 0) return;
     e.preventDefault();
     setIsDragging(true);
     dragStartRef.current = {
@@ -163,11 +178,8 @@ export function Lightbox({ images = [], initialIndex = 0, onClose }) {
     });
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
+  const handleMouseUp = () => setIsDragging(false);
 
-  // Touch pinch to zoom
   const handleTouchStart = (e) => {
     if (e.touches.length === 2) {
       const dist = Math.hypot(
@@ -189,16 +201,16 @@ export function Lightbox({ images = [], initialIndex = 0, onClose }) {
     }
   };
 
-  // Backdrop click closes only when scale is 1
   const handleBackdropClick = (e) => {
     if (e.target === containerRef.current && scale === 1) {
-      onClose();
+      onClose?.();
     }
   };
 
-  const currentImage = images[currentIndex] || '';
+  if (!images.length) return null;
 
-  return (
+  const currentImage = images[currentIndex] || images[0];
+  const ui = (
     <div
       ref={containerRef}
       className="work-lightbox"
@@ -212,8 +224,18 @@ export function Lightbox({ images = [], initialIndex = 0, onClose }) {
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
     >
-      {/* Top Controls Bar */}
       <div className="work-lightbox-topbar">
+        <button
+          type="button"
+          className="work-lightbox-btn work-lightbox-back"
+          onClick={onClose}
+          aria-label="Back to gallery"
+          title="Back"
+        >
+          <span aria-hidden="true">←</span>
+          <span>{isRtl ? 'الخلف' : 'Back'}</span>
+        </button>
+
         <span className="work-lightbox-counter" aria-live="polite">
           {currentIndex + 1} / {images.length}
         </span>
@@ -229,7 +251,6 @@ export function Lightbox({ images = [], initialIndex = 0, onClose }) {
         </button>
       </div>
 
-      {/* Prev / Next buttons */}
       {images.length > 1 && (
         <>
           <button
@@ -252,7 +273,6 @@ export function Lightbox({ images = [], initialIndex = 0, onClose }) {
         </>
       )}
 
-      {/* Image Stage */}
       <div className="work-lightbox-stage">
         <img
           src={currentImage}
@@ -268,7 +288,6 @@ export function Lightbox({ images = [], initialIndex = 0, onClose }) {
         />
       </div>
 
-      {/* Bottom Zoom Toolbar */}
       <div className="work-lightbox-toolbar" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
@@ -306,6 +325,8 @@ export function Lightbox({ images = [], initialIndex = 0, onClose }) {
       </div>
     </div>
   );
+
+  return createPortal(ui, document.body);
 }
 
 export default Lightbox;

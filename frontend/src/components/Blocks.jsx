@@ -1,10 +1,133 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLang } from '../i18n.jsx';
 import { Lightbox } from './Lightbox.jsx';
 import { WorkMedia } from './WorkMedia.jsx';
 
 function isExternalUrl(raw = '') {
   return /^https?:\/\//i.test(raw) || /^mailto:/i.test(raw) || /^tel:/i.test(raw);
+}
+
+function GalleryScroller({ images, caption, onOpen }) {
+  const { lang } = useLang();
+  const isRtl = lang === 'ar';
+  const scrollerRef = useRef(null);
+  const dragMovedRef = useRef(false);
+  const dragStartRef = useRef({ x: 0, left: 0 });
+  const [canScrollPrev, setCanScrollPrev] = useState(false);
+  const [canScrollNext, setCanScrollNext] = useState(false);
+
+  const syncState = () => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const isOverflow = el.scrollWidth > el.clientWidth + 1;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    const left = isRtl ? -el.scrollLeft : el.scrollLeft;
+    setCanScrollPrev(isOverflow && (isRtl ? left < -1 : left > 1));
+    setCanScrollNext(isOverflow && (isRtl ? left > -maxScroll + 1 : left < maxScroll - 1));
+  };
+
+  useEffect(() => {
+    syncState();
+    const el = scrollerRef.current;
+    if (!el) return undefined;
+    const onScroll = () => syncState();
+    el.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', syncState);
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', syncState);
+    };
+  }, [images.length, isRtl]);
+
+  const stepScroll = (dir) => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const amount = Math.max(140, el.clientWidth * 0.8);
+    const sign = dir * (isRtl ? -1 : 1);
+    el.scrollBy({ left: sign * amount, behavior: 'smooth' });
+  };
+
+  const onPointerDown = (event) => {
+    dragMovedRef.current = false;
+    dragStartRef.current = { x: event.clientX, left: scrollerRef.current?.scrollLeft ?? 0 };
+  };
+
+  const onPointerMove = (event) => {
+    if (!scrollerRef.current) return;
+    const delta = Math.abs(event.clientX - dragStartRef.current.x);
+    if (delta > 6) dragMovedRef.current = true;
+  };
+
+  const onPointerUp = () => {
+    requestAnimationFrame(() => {
+      dragMovedRef.current = false;
+    });
+  };
+
+  const handleTileOpen = (index) => {
+    if (dragMovedRef.current) return;
+    onOpen(index);
+  };
+
+  const regionLabel = caption || 'Gallery / المعرض';
+
+  return (
+    <div className="section-gallery-shell">
+      <div className="section-gallery-actions">
+        {images.length > 1 && canScrollPrev && (
+          <button type="button" className="section-gallery-arrow section-gallery-arrow-prev" aria-label={isRtl ? 'Next' : 'Previous'} onClick={() => stepScroll(isRtl ? 1 : -1)}>
+            {isRtl ? '→' : '←'}
+          </button>
+        )}
+        <div
+          ref={scrollerRef}
+          className="section-gallery-scroller"
+          tabIndex={0}
+          role="region"
+          aria-label={regionLabel}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerLeave={onPointerUp}
+          onKeyDown={(event) => {
+            const key = event.key;
+            if (key === 'ArrowLeft') {
+              event.preventDefault();
+              stepScroll(isRtl ? 1 : -1);
+            }
+            if (key === 'ArrowRight') {
+              event.preventDefault();
+              stepScroll(isRtl ? -1 : 1);
+            }
+            if (key === 'Enter' && document.activeElement?.dataset.galleryIndex) {
+              event.preventDefault();
+              onOpen(Number(document.activeElement.dataset.galleryIndex));
+            }
+          }}
+        >
+          {images.map((src, index) => (
+            <WorkMedia
+              key={`${caption || 'gallery'}-${index}`}
+              src={src}
+              alt={regionLabel}
+              variant="thumb"
+              onOpen={() => handleTileOpen(index)}
+              className="section-gallery-tile"
+            />
+          ))}
+        </div>
+        {images.length > 1 && canScrollNext && (
+          <button type="button" className="section-gallery-arrow section-gallery-arrow-next" aria-label={isRtl ? 'Previous' : 'Next'} onClick={() => stepScroll(isRtl ? -1 : 1)}>
+            {isRtl ? '←' : '→'}
+          </button>
+        )}
+      </div>
+      <div className="section-gallery-meta">
+        <span>{images.length} {images.length === 1 ? 'image' : 'images'} / {images.length === 1 ? 'صورة' : 'صور'}</span>
+        {caption && <small>{caption}</small>}
+      </div>
+    </div>
+  );
 }
 
 export function Blocks({ blocks = [] }) {
@@ -57,18 +180,24 @@ export function Blocks({ blocks = [] }) {
 
     if (block.type === 'GALLERY') {
       const images = (d.images || []).filter(Boolean);
+      const caption = tr(d, 'caption') || tr(d, 'title') || 'Gallery';
       if (!images.length) return null;
-      return (
-        <div key={block.id} className="section-gallery">
-          {images.map((src, index) => (
+      if (images.length === 1) {
+        return (
+          <figure key={block.id} className="section-figure">
             <WorkMedia
-              key={`${block.id}-${index}`}
-              src={src}
-              alt=""
-              variant="thumb"
-              onOpen={() => setLightbox({ images, index })}
+              src={images[0]}
+              alt={caption}
+              variant="cover"
+              onOpen={() => setLightbox({ images, index: 0 })}
             />
-          ))}
+            {caption && <figcaption>{caption}</figcaption>}
+          </figure>
+        );
+      }
+      return (
+        <div key={block.id} className="section-gallery-wrap">
+          <GalleryScroller images={images} caption={caption} onOpen={(index) => setLightbox({ images, index })} />
         </div>
       );
     }
