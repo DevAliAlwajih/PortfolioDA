@@ -20,17 +20,21 @@ function Stars({ value, onChange, label }) {
 }
 
 function ReviewForm() {
-  const { t } = useLang();
-  const [form, setForm] = useState({ name: '', email: '', rating: 5, comment: '' });
+  const { t, lang } = useLang();
+  const [form, setForm] = useState({ name: '', email: '', rating: 5, comment: '', consent: false });
   const [state, setState] = useState('idle');
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
   const submit = async (e) => {
     e.preventDefault();
+    if (!form.consent) {
+      setState('error');
+      return;
+    }
     setState('sending');
     try {
-      await api.post('/public/reviews', form);
-      setForm({ name: '', email: '', rating: 5, comment: '' });
+      await api.post('/public/reviews', { ...form, consent: true });
+      setForm({ name: '', email: '', rating: 5, comment: '', consent: false });
       setState('done');
     } catch {
       setState('error');
@@ -44,6 +48,14 @@ function ReviewForm() {
       <input required maxLength={80} placeholder={t('yourName')} value={form.name} onChange={set('name')} />
       <input required type="email" placeholder={t('yourEmail')} value={form.email} onChange={set('email')} dir="ltr" />
       <textarea required maxLength={1000} rows={3} placeholder={t('yourComment')} value={form.comment} onChange={set('comment')} />
+      <label className="consent-row" style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 8 }}>
+        <input type="checkbox" checked={!!form.consent} onChange={(e) => setForm({ ...form, consent: e.target.checked })} />
+        <span>
+          {lang === 'ar' ? 'أوافق على ' : 'I agree to the '}
+          <Link to="/policy">{t('privacyPolicy')}</Link>
+          {lang === 'ar' ? ' وأسمح بتخزين الاسم والإيميل والتعليق لعرض التقييمات.' : ' and allow my name, email, and comment to be stored for review display.'}
+        </span>
+      </label>
       <button className="btn primary" disabled={state === 'sending'}>{t('send')}</button>
       {state === 'done' && <p className="ok" role="status">{t('thanks')}</p>}
       {state === 'error' && <p className="err" role="alert">{t('failed')}</p>}

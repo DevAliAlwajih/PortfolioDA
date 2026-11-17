@@ -78,8 +78,12 @@ const path = k =>
 
 /* ─── Drawer ─── */
 function Drawer({ open, close, reviews }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const ref = useRef();
+  const [form, setForm] = useState({ name: '', email: '', rating: 5, comment: '', consent: false });
+  const [status, setStatus] = useState('idle'); // idle | sending | done | error | rate-limit | server-error
+  const [serverMsg, setServerMsg] = useState('');
+
   useEffect(() => {
     if (!open) return;
     const h = e => e.key === 'Escape' && close();
@@ -87,7 +91,77 @@ function Drawer({ open, close, reviews }) {
     ref.current?.focus();
     return () => removeEventListener('keydown', h);
   }, [open, close]);
+
+  // Reset form state when drawer is opened
+  useEffect(() => {
+    if (open) { setStatus('idle'); setServerMsg(''); }
+  }, [open]);
+
   if (!open) return null;
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!form.consent) return;
+    setStatus('sending');
+    setServerMsg('');
+    try {
+      await api.post('/public/reviews', { ...form, consent: true });
+      setForm({ name: '', email: '', rating: 5, comment: '', consent: false });
+      setStatus('done');
+    } catch (err) {
+      if (err.status === 429) {
+        setStatus('rate-limit');
+      } else if (err.status >= 500) {
+        setStatus('server-error');
+      } else {
+        setStatus('error');
+        setServerMsg(err.message || (lang === 'ar' ? 'فشل الإرسال' : 'Submission failed'));
+      }
+    }
+  };
+
+  const Stars = ({ value, onChange }) => (
+    <div className="stars" role="radiogroup" aria-label={lang === 'ar' ? `${value} نجوم` : `${value} stars`}>
+      {[1,2,3,4,5].map(n => (
+        <button key={n} type="button" className={n <= value ? 'on' : ''} onClick={() => onChange(n)} aria-label={String(n)}>★</button>
+      ))}
+    </div>
+  );
+
+  const policyLinkAr = (
+    <span>
+      {'أوافق على '}
+      <a
+        href="/policy"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ textDecoration: 'underline', color: 'var(--accent, #6fd0ff)', minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+        onClick={e => e.stopPropagation()}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
+      >
+        سياسة الخصوصية
+      </a>
+      {' وعلى حفظ اسمي وبريدي لأغراض مراجعة التقييم. لن يظهر بريدي للعامة.'}
+    </span>
+  );
+
+  const policyLinkEn = (
+    <span>
+      {'I agree to the '}
+      <a
+        href="/policy"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ textDecoration: 'underline', color: 'var(--accent, #6fd0ff)', minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+        onClick={e => e.stopPropagation()}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
+      >
+        Privacy Policy
+      </a>
+      {' and to storing my name and email to moderate my review. My email is never shown publicly.'}
+    </span>
+  );
+
   return (
     <div className="drawer-backdrop" onMouseDown={close}>
       <aside ref={ref} tabIndex="-1" className="drawer" role="dialog" aria-modal="true" onMouseDown={e => e.stopPropagation()}>
@@ -99,18 +173,130 @@ function Drawer({ open, close, reviews }) {
             <p>{r.comment}</p>
           </article>
         ))}
-        <form className="review-form" onSubmit={async e => {
-          e.preventDefault();
-          const f = new FormData(e.currentTarget);
-          await api.post('/public/reviews', { name: f.get('name'), email: f.get('email'), comment: f.get('comment'), rating: 5 });
-          e.currentTarget.reset();
-        }}>
-          <h3>{t('addReview')}</h3>
-          <input required name="name" placeholder={t('yourName')} />
-          <input required name="email" type="email" placeholder={t('yourEmail')} />
-          <textarea required name="comment" placeholder={t('yourComment')} />
-          <button className="btn primary">{t('send')}</button>
-        </form>
+
+        {status === 'done' ? (
+          <div>
+            <p className="ok" role="status">
+              {lang === 'ar'
+                ? 'شكرًا لك! سيظهر تقييمك بعد مراجعته.'
+                : 'Thank you! Your review will appear after it is approved.'}
+            </p>
+            <button className="btn" onClick={() => setStatus('idle')}>
+              {lang === 'ar' ? 'إضافة تقييم آخر' : 'Add another review'}
+            </button>
+          </div>
+        ) : (
+          <form className="review-form" onSubmit={submit}>
+            <h3>{t('addReview')}</h3>
+            <Stars value={form.rating} onChange={n => setForm({ ...form, rating: n })} />
+            <input
+              required
+              name="name"
+              maxLength={80}
+              placeholder={t('yourName')}
+              value={form.name}
+              onChange={e => setForm({ ...form, name: e.target.value })}
+            />
+            <input
+              required
+              name="email"
+              type="email"
+              placeholder={t('yourEmail')}
+              value={form.email}
+              onChange={e => setForm({ ...form, email: e.target.value })}
+              dir="ltr"
+            />
+            <small className="muted" style={{ display: 'block', marginTop: -4, marginBottom: 4 }}>
+              {lang === 'ar' ? 'بريدك يظهر لصاحب الموقع فقط.' : 'Only the site owner sees your email.'}
+            </small>
+            <textarea
+              required
+              name="comment"
+              maxLength={1000}
+              rows={3}
+              placeholder={t('yourComment')}
+              value={form.comment}
+              onChange={e => setForm({ ...form, comment: e.target.value })}
+            />
+
+            {/* Consent: checkbox + separate span label (NOT wrapped in <label> together) */}
+            <div className="consent-row" style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 8 }}>
+              <input
+                id="drawer-consent"
+                type="checkbox"
+                checked={!!form.consent}
+                onChange={e => setForm({ ...form, consent: e.target.checked })}
+                style={{ marginTop: 4, flexShrink: 0 }}
+              />
+              <span style={{ lineHeight: 1.5 }}>
+                <label htmlFor="drawer-consent" style={{ display: 'inline' }}>
+                  {lang === 'ar' ? policyLinkAr : policyLinkEn}
+                </label>
+              </span>
+            </div>
+
+            {!form.consent && (
+              <small className="muted" style={{ display: 'block', marginTop: 4 }}>
+                {lang === 'ar'
+                  ? 'يجب قبول سياسة الخصوصية لإرسال التقييم.'
+                  : 'You must accept the Privacy Policy to submit.'}
+              </small>
+            )}
+
+            {status === 'error' && serverMsg && (
+              <p className="err" role="alert">{serverMsg}</p>
+            )}
+            {status === 'rate-limit' && (
+              <p className="err" role="alert">
+                {lang === 'ar'
+                  ? 'محاولات كثيرة، حاول لاحقًا / Too many attempts, try again later'
+                  : 'Too many attempts, try again later / محاولات كثيرة، حاول لاحقًا'}
+              </p>
+            )}
+            {status === 'server-error' && (
+              <p className="err" role="alert">
+                {lang === 'ar'
+                  ? 'خطأ في الخادم. حاول مجددًا. / Server error, please retry.'
+                  : 'Server error, please retry. / خطأ في الخادم.'}
+                {' '}
+                <button type="button" className="link" onClick={submit}>
+                  {lang === 'ar' ? 'إعادة المحاولة' : 'Retry'}
+                </button>
+              </p>
+            )}
+
+            <button
+              className="btn primary"
+              disabled={!form.consent || status === 'sending'}
+              style={{ marginTop: 8 }}
+            >
+              {status === 'sending'
+                ? (lang === 'ar' ? 'جارٍ الإرسال…' : 'Sending…')
+                : t('send')}
+            </button>
+          </form>
+        )}
+
+        {/* Standalone policy link at bottom of drawer */}
+        <p style={{ marginTop: '1.5rem', fontSize: '0.85em', textAlign: 'center' }}>
+          <a
+            href="/policy"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ textDecoration: 'underline', color: 'var(--accent, #6fd0ff)' }}
+          >
+            {lang === 'ar' ? 'سياسة الخصوصية' : 'Privacy Policy'}
+          </a>
+          {' / '}
+          <a
+            href="/policy"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ textDecoration: 'underline', color: 'var(--accent, #6fd0ff)' }}
+          >
+            {lang === 'ar' ? 'Privacy Policy' : 'سياسة الخصوصية'}
+          </a>
+        </p>
       </aside>
     </div>
   );
@@ -387,6 +573,49 @@ function View({ data, open }) {
   return <Hero data={data} open={open} onVisitWork={onVisitWork} />;
 }
 
+function PolicyPage() {
+  const { lang, t } = useLang();
+  const [doc, setDoc] = useState(null);
+
+  useEffect(() => {
+    api.get('/public/privacy').then(d => { if (d) setDoc(d); }).catch(() => {});
+  }, []);
+
+  const fallback = lang === 'ar'
+    ? { title: 'سياسة الخصوصية', body: 'نحن نلتزم بحماية بيانات زوارنا. لا نبيع البيانات ولا نشاركها مع أطراف ثالثة لأغراض التسويق.\n\n- يتم جمع الاسم والبريد الإلكتروني والتقييم والتعليق فقط عند إرسال مراجعة.\n- يُحفظ البريد الإلكتروني لأغراض التواصل الإداري ولا يظهر في الصفحات العامة.\n- لا توجد ملفات تعريف ارتباط أو تحليلات أو تعقب.\n\nبإرسال تقييم، فأنت توافق على تخزين الاسم والبريد الإلكتروني والتعليق وفقاً لهذه السياسة.' }
+    : { title: 'Privacy Policy', body: 'We protect visitor data and do not sell or share it with third parties for marketing.\n\n- Name, email, rating, and comment are collected only when a visitor submits a review.\n- The email is stored for admin follow-up and is never shown on public pages.\n- This site does not use analytics, cookies, or tracker scripts.\n\nBy submitting a review, you agree that your name, email, and comment may be stored per this policy.' };
+
+  const title = doc ? (lang === 'ar' ? doc.titleAr || doc.titleEn : doc.titleEn || doc.titleAr) : fallback.title;
+  const body  = doc ? (lang === 'ar' ? doc.bodyAr  || doc.bodyEn  : doc.bodyEn  || doc.bodyAr)  : fallback.body;
+
+  const renderInline = (text) => {
+    const parts = text.split(/\*\*(.+?)\*\*/g);
+    return parts.map((part, i) => i % 2 === 1 ? <strong key={i}>{part}</strong> : part);
+  };
+  const renderBody = (text) => {
+    if (!text) return null;
+    return text.split(/\n\n+/).map((block, i) => {
+      if (block.startsWith('## ')) return <h2 key={i}>{block.slice(3)}</h2>;
+      if (block.trim().split('\n').every(l => l.startsWith('- '))) {
+        return <ul key={i}>{block.trim().split('\n').map((l, j) => <li key={j}>{renderInline(l.slice(2))}</li>)}</ul>;
+      }
+      return <p key={i}>{renderInline(block)}</p>;
+    });
+  };
+
+  return (
+    <section className="center-view policy-page" style={{ maxWidth: 860, margin: '0 auto', padding: '2rem 1rem 4rem' }}>
+      <h1>{title}</h1>
+      {renderBody(body)}
+      {doc?.updatedAt && (
+        <p className="muted" style={{ fontSize: '0.85em', marginTop: '2rem' }}>
+          {lang === 'ar' ? 'آخر تحديث:' : 'Last updated:'} {new Date(doc.updatedAt).toLocaleDateString(lang === 'ar' ? 'ar' : 'en')}
+        </p>
+      )}
+      <Link className="btn primary" to="/">{t('back')}</Link>
+    </section>
+  );
+}
 /* ─── App root ─── */
 export default function App() {
   const { lang, setLang, t, tr } = useLang();
@@ -460,6 +689,8 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [loc.pathname]);
 
+  if (loc.pathname === '/policy')
+    return <PolicyPage />;
   if (loc.pathname.startsWith('/admin'))
     return (
       <Suspense fallback={<main className="loading"><div className="skeleton" /></main>}>

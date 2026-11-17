@@ -123,11 +123,12 @@ model Contact {
 }
 
 model Review {
-  id        Int      @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   name      String
   email     String
   rating    Int
   comment   String
-  approved  Boolean  @default(false)
-  createdAt DateTime @default(now())
+  approved  Boolean   @default(false)
+  consentAt DateTime?
+  createdAt DateTime  @default(now())
 }

@@ -443,30 +443,207 @@ const WORK_FIELDS = [
 
 function ReviewsAdmin() {
   const [items, setItems] = useState([]);
-  const load = useCallback(() => api.get('/admin/reviews').then(setItems), []);
+  const [loadErr, setLoadErr] = useState(null);
+  const [email, setEmail] = useState('');
+  const [confirm, setConfirm] = useState(false);
+  const [search, setSearch] = useState('');
+  const [notify, note] = useNotice();
+
+  const load = useCallback(async () => {
+    setLoadErr(null);
+    try {
+      const list = await api.get('/admin/reviews');
+      setItems(list);
+    } catch (x) {
+      setLoadErr(x.message || 'فشل تحميل التقييمات');
+    }
+  }, []);
+
   useEffect(() => { load(); }, [load]);
-  const toggle = async (r) => { await api.put(`/admin/reviews/${r.id}`, { approved: !r.approved }); load(); };
-  const del = async (r) => { await api.del(`/admin/reviews/${r.id}`); load(); };
+
+  const toggle = async (r) => {
+    try { await api.put(`/admin/reviews/${r.id}`, { approved: !r.approved }); await load(); }
+    catch (x) { notify(x.message, true); }
+  };
+  const del = async (r) => {
+    try { await api.del(`/admin/reviews/${r.id}`); await load(); }
+    catch (x) { notify(x.message, true); }
+  };
+  const delByEmail = async (e) => {
+    e.preventDefault();
+    const value = email.trim().toLowerCase();
+    if (!value) { notify('اكتب إيميلًا أولًا.', true); return; }
+    if (!confirm) { notify('يجب تأكيد الحذف.', true); return; }
+    try {
+      const result = await api.del(`/admin/reviews/email/${encodeURIComponent(value)}`, { confirm: true });
+      notify(`تم حذف ${result.deleted ?? 0} تقييم(ات).`);
+      setEmail(''); setConfirm(false); load();
+    } catch (x) { notify(x.message, true); }
+  };
+
+  const pending = items.filter(r => !r.approved);
+  const filtered = search
+    ? items.filter(r => r.email?.toLowerCase().includes(search.toLowerCase()) || r.name?.toLowerCase().includes(search.toLowerCase()))
+    : items;
+  // Show pending first
+  const sorted = [...filtered.filter(r => !r.approved), ...filtered.filter(r => r.approved)];
+
+  if (loadErr) {
+    return (
+      <div className="form">
+        <p className="err" role="alert">خطأ في تحميل التقييمات: {loadErr}</p>
+        <button className="btn" onClick={load}>إعادة المحاولة / Retry</button>
+      </div>
+    );
+  }
+
   return (
     <div className="form">
-      <p className="muted">التقييم الجديد لا يظهر للزوار حتى توافق عليه. الإيميل يظهر لك أنت فقط.</p>
-      {items.length === 0 && <p className="muted">لا توجد تقييمات.</p>}
-      {items.map((r) => (
+      <p className="muted">
+        التقييم الجديد لا يظهر للزوار حتى توافق عليه. الإيميل يظهر لك أنت فقط.
+        {pending.length > 0 && <strong style={{ color: 'var(--warn, #f5c26b)', marginRight: 8 }}> ({pending.length} بانتظار الموافقة)</strong>}
+      </p>
+
+      {/* Search */}
+      <Field label="بحث حسب الاسم أو الإيميل">
+        <input dir="ltr" value={search} onChange={e => setSearch(e.target.value)} placeholder="name or email…" />
+      </Field>
+
+      {/* Delete by email tool */}
+      <details style={{ marginBottom: '1rem' }}>
+        <summary style={{ cursor: 'pointer', marginBottom: 8 }}>🗑 حذف جميع تقييمات إيميل معين</summary>
+        <form onSubmit={delByEmail} className="row-actions" style={{ flexWrap: 'wrap' }}>
+          <Field label="الإيميل"><input dir="ltr" value={email} onChange={e => setEmail(e.target.value)} placeholder="user@example.com" /></Field>
+          <label className="field" style={{ minWidth: 200 }}>
+            <span>تأكيد الحذف</span>
+            <input type="checkbox" checked={confirm} onChange={e => setConfirm(e.target.checked)} />
+          </label>
+          <button className="btn danger" type="submit">حذف جميع تقييمات هذا الإيميل</button>
+        </form>
+      </details>
+
+      {note}
+
+      {sorted.length === 0 && <p className="muted">لا توجد تقييمات.</p>}
+      {sorted.map((r) => (
         <article key={r.id} className="glass review-admin">
           <div className="review-top">
             <strong>{r.name}</strong>
             <span dir="ltr" className="muted">{r.email}</span>
             <span className="pill">{'★'.repeat(r.rating)}</span>
-            <span className={`pill ${r.approved ? '' : 'warn'}`}>{r.approved ? 'ظاهر' : 'بانتظار الموافقة'}</span>
+            <span className={`pill ${r.approved ? '' : 'warn'}`}>{r.approved ? 'معتمد / Approved' : 'بانتظار الموافقة / Pending'}</span>
           </div>
           <p>{r.comment}</p>
+          <div className="muted" style={{ fontSize: '0.8em', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <span>تاريخ الإرسال: {new Date(r.createdAt).toLocaleString('en-GB')}</span>
+            {r.consentAt && <span>قبول السياسة: {new Date(r.consentAt).toLocaleString('en-GB')}</span>}
+          </div>
           <div className="row-actions">
-            <button className="btn small primary" onClick={() => toggle(r)}>{r.approved ? 'إخفاء' : 'موافقة وإظهار'}</button>
+            <button className="btn small primary" onClick={() => toggle(r)}>{r.approved ? 'إخفاء / Hide' : 'موافقة وإظهار / Approve'}</button>
             <Confirm onYes={() => del(r)}>حذف</Confirm>
           </div>
         </article>
       ))}
     </div>
+  );
+}
+
+/* ---------- privacy policy editor ---------- */
+
+const DEFAULT_PRIVACY = {
+  titleAr: 'سياسة الخصوصية',
+  titleEn: 'Privacy Policy',
+  bodyAr: 'نحن نلتزم بحماية بيانات زوارنا. لا نبيع البيانات ولا نشاركها مع أطراف ثالثة لأغراض التسويق.\n\n## ما نجمعه\n\n- يتم جمع الاسم والبريد الإلكتروني والتقييم والتعليق فقط عند إرسال مراجعة.\n- يُحفظ البريد الإلكتروني لأغراض الإشراف الإداري؛ ولا يتم إظهاره في الصفحات العامة.\n- لا توجد ملفات تعريف ارتباط أو تحليلات أو تعقب.\n\n**بإرسال تقييم، فأنت توافق على تخزين الاسم والبريد الإلكتروني والتعليق وفقًا لهذه السياسة.**',
+  bodyEn: 'We protect visitor data and do not sell or share it with third parties for marketing.\n\n## What We Collect\n\n- Name, email, rating, and comment are collected only when a visitor submits a review.\n- The email is stored for admin moderation and is never shown on public pages.\n- This site does not use analytics, cookies, or tracker scripts.\n\n**By submitting a review, you agree that your name, email, and comment may be stored per this policy.**',
+};
+
+function PrivacyEditor() {
+  const [doc, setDoc] = useState(null);
+  const [subTab, setSubTab] = useState('ar');
+  const [notify, note] = useNotice();
+  const [resetting, setResetting] = useState(false);
+
+  const load = useCallback(async () => {
+    try { setDoc(await api.get('/admin/privacy')); }
+    catch (x) { notify(x.message, true); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const save = async (e) => {
+    e.preventDefault();
+    try { setDoc(await api.put('/admin/privacy', doc)); notify('تم الحفظ'); }
+    catch (x) { notify(x.message, true); }
+  };
+
+  const reset = async () => {
+    setResetting(false);
+    const val = { ...DEFAULT_PRIVACY, updatedAt: new Date().toISOString() };
+    try { setDoc(await api.put('/admin/privacy', val)); notify('تمت إعادة الضبط إلى النص الافتراضي'); }
+    catch (x) { notify(x.message, true); }
+  };
+
+  if (!doc) return <p className="muted">جارٍ التحميل…</p>;
+
+  return (
+    <form onSubmit={save} className="form">
+      <p className="muted">
+        حرر نص سياسة الخصوصية بالعربية والإنجليزية. يدعم الصياغة بـ Markdown (## عنوان، - قائمة، **굵게**).
+      </p>
+
+      <div className="tabs" role="tablist" style={{ marginBottom: '1rem' }}>
+        <button type="button" role="tab" aria-selected={subTab === 'ar'} className={subTab === 'ar' ? 'on' : ''} onClick={() => setSubTab('ar')}>العربية</button>
+        <button type="button" role="tab" aria-selected={subTab === 'en'} className={subTab === 'en' ? 'on' : ''} onClick={() => setSubTab('en')}>English</button>
+      </div>
+
+      {subTab === 'ar' && (
+        <>
+          <Field label="عنوان الصفحة (عربي)">
+            <input value={doc.titleAr || ''} onChange={e => setDoc({ ...doc, titleAr: e.target.value })} />
+          </Field>
+          <Field label="نص السياسة (عربي)">
+            <textarea rows={16} value={doc.bodyAr || ''} onChange={e => setDoc({ ...doc, bodyAr: e.target.value })} style={{ fontFamily: 'monospace', fontSize: '0.9em' }} />
+          </Field>
+        </>
+      )}
+      {subTab === 'en' && (
+        <>
+          <Field label="Page title (English)">
+            <input dir="ltr" value={doc.titleEn || ''} onChange={e => setDoc({ ...doc, titleEn: e.target.value })} />
+          </Field>
+          <Field label="Policy text (English)">
+            <textarea dir="ltr" rows={16} value={doc.bodyEn || ''} onChange={e => setDoc({ ...doc, bodyEn: e.target.value })} style={{ fontFamily: 'monospace', fontSize: '0.9em' }} />
+          </Field>
+        </>
+      )}
+
+      {doc.updatedAt && (
+        <p className="muted" style={{ fontSize: '0.85em' }}>
+          آخر تحديث / Last updated: {new Date(doc.updatedAt).toLocaleString('en-GB')}
+        </p>
+      )}
+
+      <div className="row-actions" style={{ marginTop: '1rem' }}>
+        <button className="btn primary" type="submit">حفظ / Save</button>
+        {resetting
+          ? (
+            <span className="confirm">
+              هل أنت متأكد من إعادة الضبط؟
+              <button type="button" className="btn small danger" onClick={reset}>نعم، إعادة الضبط</button>
+              <button type="button" className="btn small" onClick={() => setResetting(false)}>إلغاء</button>
+            </span>
+          )
+          : (
+            <button type="button" className="btn" onClick={() => setResetting(true)}>
+              إعادة الضبط إلى الافتراضي / Reset to default
+            </button>
+          )
+        }
+        <a className="btn" href="/policy" target="_blank" rel="noopener noreferrer">
+          معاينة / Preview ↗
+        </a>
+      </div>
+      {note}
+    </form>
   );
 }
 
@@ -661,6 +838,7 @@ const TABS = [
   ['sections', 'أقسام إضافية'],
   ['layout', 'القائمة والترتيب'],
   ['reviews', 'التقييمات'],
+  ['privacy', 'الخصوصية'],
   ['account', 'الحساب'],
 ];
 
@@ -714,6 +892,7 @@ export default function Admin() {
         {tab === 'sections' && <SectionsEditor />}
         {tab === 'layout' && <LayoutEditor />}
         {tab === 'reviews' && <ReviewsAdmin />}
+        {tab === 'privacy' && <PrivacyEditor />}
         {tab === 'account' && <Account email={me} onEmailChange={setMe} />}
       </div>
     </div>

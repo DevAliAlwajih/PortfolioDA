@@ -1,6 +1,6 @@
-import { Body, Controller, Get, NotFoundException, Param, ParseIntPipe, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, NotFoundException, Param, ParseIntPipe, Post } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { IsEmail, IsInt, IsString, Length, Max, Min } from 'class-validator';
+import { IsBoolean, IsEmail, IsInt, IsString, Length, Max, Min } from 'class-validator';
 import { PrismaService } from '../common/prisma.service';
 import { resolveLayout } from '../common/layout';
 
@@ -9,6 +9,7 @@ class ReviewDto {
   @IsEmail() email: string;
   @IsInt() @Min(1) @Max(5) rating: number;
   @IsString() @Length(1, 1000) comment: string;
+  @IsBoolean() consent: boolean;
 }
 
 /** Returns true if a block has enough content to count as "visible" */
@@ -68,6 +69,12 @@ export class PublicController {
     return { profile, sections, works, links, contacts, reviews, layout };
   }
 
+  @Get('privacy')
+  async privacy() {
+    const row = await this.prisma.siteSetting.findUnique({ where: { key: 'privacy' } });
+    return row ? row.value : null;
+  }
+
   @Get('works/:id')
   async work(@Param('id', ParseIntPipe) id: number) {
     const work = await this.prisma.work.findUnique({ where: { id }, include: { files: true } });
@@ -75,9 +82,15 @@ export class PublicController {
     return work;
   }
 
-  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @Throttle({
+    default: process.env.NODE_ENV === 'production'
+      ? { limit: 5, ttl: 600_000 }   // 5 per 10 min in production
+      : { limit: 60, ttl: 60_000 },  // 60 per min in dev (for testing)
+  })
   @Post('reviews')
   async review(@Body() dto: ReviewDto) {
+    if (!dto.consent) throw new BadRequestException('Consent is required before submitting a review.');
+
     await this.prisma.review.create({
       data: {
         name: dto.name.trim(),
@@ -85,6 +98,7 @@ export class PublicController {
         rating: dto.rating,
         comment: dto.comment.trim(),
         approved: false,
+        consentAt: new Date(),
       },
     });
     return { ok: true };

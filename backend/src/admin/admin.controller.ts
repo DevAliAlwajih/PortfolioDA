@@ -171,6 +171,55 @@ export class AdminController {
     return this.prisma.profile.upsert({ where: { id: 1 }, update: data, create: { id: 1, ...data } });
   }
 
+  // ---------- privacy policy document (stored in SiteSetting key='privacy')
+  private readonly DEFAULT_PRIVACY = {
+    titleAr: 'سياسة الخصوصية',
+    titleEn: 'Privacy Policy',
+    bodyAr:
+      'نحن نلتزم بحماية بيانات زوارنا. لا نبيع البيانات ولا نشاركها مع أطراف ثالثة لأغراض التسويق.\n\n' +
+      '## ما نجمعه\n\n' +
+      '- يتم جمع الاسم، البريد الإلكتروني، التقييم، والتعليق فقط عند إرسال مراجعة من الزائر.\n' +
+      '- يُحفظ البريد الإلكتروني لأغراض الإشراف الإداري؛ ولا يتم إظهاره في الصفحات العامة.\n' +
+      '- لا توجد ملفات تعريف ارتباط أو تحليلات أو تعقب للمستخدمين على هذا الموقع.\n\n' +
+      '**بإرسال تقييم، فأنت توافق على تخزين الاسم والبريد الإلكتروني والتعليق وفقًا لهذه السياسة.**',
+    bodyEn:
+      'We protect visitor data and do not sell or share it with third parties for marketing.\n\n' +
+      '## What We Collect\n\n' +
+      '- Name, email, rating, and comment are collected only when a visitor submits a review.\n' +
+      '- The email is stored for admin moderation and is never shown on public pages.\n' +
+      '- This site does not use analytics, cookies, or tracker scripts.\n\n' +
+      '**By submitting a review, you agree that your name, email, and comment may be stored per this policy.**',
+    updatedAt: new Date().toISOString(),
+  };
+
+  @Get('privacy')
+  async getPrivacy() {
+    const row = await this.prisma.siteSetting.findUnique({ where: { key: 'privacy' } });
+    if (row) return row.value;
+    // Auto-seed default
+    const val = this.DEFAULT_PRIVACY;
+    await this.prisma.siteSetting.create({ data: { key: 'privacy', value: val } });
+    return val;
+  }
+
+  @Put('privacy')
+  async putPrivacy(@Body() body: any) {
+    const titleAr = typeof body?.titleAr === 'string' ? body.titleAr.slice(0, 200) : '';
+    const titleEn = typeof body?.titleEn === 'string' ? body.titleEn.slice(0, 200) : '';
+    const bodyAr  = typeof body?.bodyAr  === 'string' ? body.bodyAr.slice(0, 20000) : '';
+    const bodyEn  = typeof body?.bodyEn  === 'string' ? body.bodyEn.slice(0, 20000) : '';
+    if (!titleAr && !titleEn) throw new BadRequestException('Title is required');
+    const val = { titleAr, titleEn, bodyAr, bodyEn, updatedAt: new Date().toISOString() };
+    await this.prisma.siteSetting.upsert({
+      where: { key: 'privacy' },
+      update: { value: val },
+      create: { key: 'privacy', value: val },
+    });
+    return val;
+  }
+
+  // ---------- public privacy policy (no auth required) - exposed via public controller
+
   // ---------- reviews
   @Get('reviews')
   reviews() {
@@ -188,6 +237,16 @@ export class AdminController {
   async delReview(@Param('id', ParseIntPipe) id: number) {
     await this.prisma.review.deleteMany({ where: { id } });
     return { ok: true };
+  }
+
+  @Delete('reviews/email/:email')
+  async deleteReviewsByEmail(@Param('email') email: string, @Body() body: any) {
+    const normalized = decodeURIComponent(email).trim().toLowerCase();
+    if (!normalized) throw new BadRequestException('Email is required');
+    if (body?.confirm !== true) throw new BadRequestException('Confirmation required');
+
+    const result = await this.prisma.review.deleteMany({ where: { email: normalized } });
+    return { ok: true, deleted: result.count };
   }
 
   // ---------- uploads (images and downloadable files)

@@ -28,7 +28,7 @@ export const api = {
   get: (u) => request('GET', `/api${u}`),
   post: (u, b) => request('POST', `/api${u}`, b),
   put: (u, b) => request('PUT', `/api${u}`, b),
-  del: (u) => request('DELETE', `/api${u}`),
+  del: (u, b) => request('DELETE', `/api${u}`, b),
   upload: (file) => {
     const fd = new FormData();
     fd.append('file', file);

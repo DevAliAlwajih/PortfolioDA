@@ -33,6 +33,7 @@ export function LogoPlate({ width }) {
 }
 
 export function Footer() {
+  const { t } = useLang();
   const year = new Date().getFullYear();
   return (
     <footer className="footer">
@@ -40,6 +41,9 @@ export function Footer() {
       <p className="footer-copy muted" dir="ltr">
         © {year} Dev.AliAlwajih
       </p>
+      <Link to="/policy" className="muted" style={{ marginTop: 8, display: 'inline-block' }}>
+        {t('privacyPolicy')}
+      </Link>
     </footer>
   );
 }
