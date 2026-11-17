@@ -441,7 +441,7 @@ const WORK_FIELDS = [
 
 /* ---------- reviews ---------- */
 
-function ReviewsAdmin() {
+function ReviewsAdmin({ onPendingChange }) {
   const [items, setItems] = useState([]);
   const [loadErr, setLoadErr] = useState(null);
   const [email, setEmail] = useState('');
@@ -454,10 +454,13 @@ function ReviewsAdmin() {
     try {
       const list = await api.get('/admin/reviews');
       setItems(list);
+      if (onPendingChange) {
+        onPendingChange(list.filter(r => !r.approved).length);
+      }
     } catch (x) {
       setLoadErr(x.message || 'فشل تحميل التقييمات');
     }
-  }, []);
+  }, [onPendingChange]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -846,12 +849,21 @@ export default function Admin() {
   const [me, setMe] = useState(null);
   const [checking, setChecking] = useState(!!getToken());
   const [tab, setTab] = useState('profile');
+  const [pendingCount, setPendingCount] = useState(0);
 
   const check = useCallback(() => {
     if (!getToken()) { setMe(null); setChecking(false); return; }
     api.get('/auth/me').then((r) => setMe(r.email)).catch(() => { setToken(''); setMe(null); }).finally(() => setChecking(false));
   }, []);
   useEffect(() => { check(); }, [check]);
+
+  useEffect(() => {
+    if (me) {
+      api.get('/admin/reviews')
+        .then(list => setPendingCount(list.filter(r => !r.approved).length))
+        .catch(() => {});
+    }
+  }, [me]);
 
   if (checking) return <p className="center-note">…</p>;
   if (!me) return <div className="wrap admin" dir="rtl"><Auth onDone={check} /></div>;
@@ -867,7 +879,29 @@ export default function Admin() {
       </div>
       <h1>لوحة الإدارة</h1>
       <div className="tabs" role="tablist">
-        {TABS.map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
+        {TABS.map(([k, l]) => (
+          <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
+            {l}
+            {k === 'reviews' && pendingCount > 0 && (
+              <span
+                className="badge pending-badge"
+                style={{
+                  marginInlineStart: 6,
+                  background: '#f5c26b',
+                  color: '#111',
+                  padding: '2px 7px',
+                  borderRadius: 10,
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  display: 'inline-block',
+                  lineHeight: 1.2,
+                }}
+              >
+                {pendingCount}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
       <div className="panel glass">
         {tab === 'profile' && <ProfileEditor />}
@@ -891,7 +925,7 @@ export default function Admin() {
         )}
         {tab === 'sections' && <SectionsEditor />}
         {tab === 'layout' && <LayoutEditor />}
-        {tab === 'reviews' && <ReviewsAdmin />}
+        {tab === 'reviews' && <ReviewsAdmin onPendingChange={setPendingCount} />}
         {tab === 'privacy' && <PrivacyEditor />}
         {tab === 'account' && <Account email={me} onEmailChange={setMe} />}
       </div>

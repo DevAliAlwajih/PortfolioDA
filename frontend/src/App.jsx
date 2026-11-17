@@ -80,7 +80,9 @@ const path = k =>
 function Drawer({ open, close, reviews }) {
   const { t, lang } = useLang();
   const ref = useRef();
-  const [form, setForm] = useState({ name: '', email: '', rating: 5, comment: '', consent: false });
+  const [form, setForm] = useState({ name: '', email: '', rating: 0, comment: '', consent: false });
+  const [ratingHover, setRatingHover] = useState(0);
+  const [ratingTouched, setRatingTouched] = useState(false);
   const [status, setStatus] = useState('idle'); // idle | sending | done | error | rate-limit | server-error
   const [serverMsg, setServerMsg] = useState('');
 
@@ -94,19 +96,31 @@ function Drawer({ open, close, reviews }) {
 
   // Reset form state when drawer is opened
   useEffect(() => {
-    if (open) { setStatus('idle'); setServerMsg(''); }
+    if (open) {
+      setStatus('idle');
+      setServerMsg('');
+      setForm({ name: '', email: '', rating: 0, comment: '', consent: false });
+      setRatingHover(0);
+      setRatingTouched(false);
+    }
   }, [open]);
 
   if (!open) return null;
 
   const submit = async (e) => {
     e.preventDefault();
+    if (!form.rating) {
+      setRatingTouched(true);
+      return;
+    }
     if (!form.consent) return;
     setStatus('sending');
     setServerMsg('');
     try {
       await api.post('/public/reviews', { ...form, consent: true });
-      setForm({ name: '', email: '', rating: 5, comment: '', consent: false });
+      setForm({ name: '', email: '', rating: 0, comment: '', consent: false });
+      setRatingHover(0);
+      setRatingTouched(false);
       setStatus('done');
     } catch (err) {
       if (err.status === 429) {
@@ -120,13 +134,31 @@ function Drawer({ open, close, reviews }) {
     }
   };
 
-  const Stars = ({ value, onChange }) => (
-    <div className="stars" role="radiogroup" aria-label={lang === 'ar' ? `${value} نجوم` : `${value} stars`}>
-      {[1,2,3,4,5].map(n => (
-        <button key={n} type="button" className={n <= value ? 'on' : ''} onClick={() => onChange(n)} aria-label={String(n)}>★</button>
-      ))}
-    </div>
-  );
+  const activeRating = ratingHover || form.rating || 0;
+
+  const onStarKeyDown = (e, n) => {
+    const isRtl = lang === 'ar';
+    let target = null;
+    if (e.key === 'ArrowRight') {
+      target = isRtl ? (n > 1 ? n - 1 : 5) : (n < 5 ? n + 1 : 1);
+    } else if (e.key === 'ArrowLeft') {
+      target = isRtl ? (n < 5 ? n + 1 : 1) : (n > 1 ? n - 1 : 5);
+    } else if (e.key === 'ArrowUp') {
+      target = n < 5 ? n + 1 : 1;
+    } else if (e.key === 'ArrowDown') {
+      target = n > 1 ? n - 1 : 5;
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setForm(prev => ({ ...prev, rating: n }));
+      return;
+    }
+    if (target !== null) {
+      e.preventDefault();
+      setForm(prev => ({ ...prev, rating: target }));
+      const btn = ref.current?.querySelector(`[data-star="${target}"]`);
+      btn?.focus();
+    }
+  };
 
   const policyLinkAr = (
     <span>
@@ -188,7 +220,70 @@ function Drawer({ open, close, reviews }) {
         ) : (
           <form className="review-form" onSubmit={submit}>
             <h3>{t('addReview')}</h3>
-            <Stars value={form.rating} onChange={n => setForm({ ...form, rating: n })} />
+
+            {/* Accessible interactive Star Rating Radiogroup */}
+            <div
+              className="stars-rating-field"
+              style={{ margin: '8px 0' }}
+              role="radiogroup"
+              aria-label={lang === 'ar' ? 'التقييم بالنجوم' : 'Star rating'}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                {[1, 2, 3, 4, 5].map((n) => {
+                  const isFilled = n <= activeRating;
+                  const isChecked = form.rating === n;
+                  const label = lang === 'ar' ? `${n} من 5` : `${n} of 5`;
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      role="radio"
+                      data-star={n}
+                      aria-checked={isChecked}
+                      aria-label={label}
+                      tabIndex={form.rating === n || (!form.rating && n === 1) ? 0 : -1}
+                      onClick={() => setForm(prev => ({ ...prev, rating: n }))}
+                      onMouseEnter={() => setRatingHover(n)}
+                      onMouseLeave={() => setRatingHover(0)}
+                      onFocus={() => setRatingHover(n)}
+                      onBlur={() => setRatingHover(0)}
+                      onKeyDown={(e) => onStarKeyDown(e, n)}
+                      style={{
+                        width: 44,
+                        height: 44,
+                        minWidth: 44,
+                        minHeight: 44,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                        fontSize: '1.75rem',
+                        color: isFilled ? '#f5c26b' : 'rgba(255, 255, 255, 0.25)',
+                        transform: ratingHover === n ? 'scale(1.2)' : 'none',
+                        transition: 'transform 0.15s, color 0.15s',
+                        outlineOffset: 2,
+                      }}
+                    >
+                      ★
+                    </button>
+                  );
+                })}
+                {form.rating > 0 && (
+                  <span style={{ fontSize: '0.85rem', color: '#f5c26b', marginInlineStart: 6 }}>
+                    {lang === 'ar' ? `${form.rating} من 5` : `${form.rating} of 5`}
+                  </span>
+                )}
+              </div>
+              {ratingTouched && !form.rating && (
+                <small className="err" role="alert" style={{ display: 'block', marginTop: 4 }}>
+                  {lang === 'ar' ? 'يرجى تحديد التقييم بالنجوم (1 إلى 5).' : 'Please select a star rating (1 to 5).'}
+                </small>
+              )}
+            </div>
+
             <input
               required
               name="name"
@@ -235,6 +330,13 @@ function Drawer({ open, close, reviews }) {
               </span>
             </div>
 
+            {!form.rating && (
+              <small className="muted" style={{ display: 'block', marginTop: 4 }}>
+                {lang === 'ar'
+                  ? 'يجب تحديد التقييم بالنجوم للمتابعة.'
+                  : 'Please choose a star rating to proceed.'}
+              </small>
+            )}
             {!form.consent && (
               <small className="muted" style={{ display: 'block', marginTop: 4 }}>
                 {lang === 'ar'
@@ -267,7 +369,7 @@ function Drawer({ open, close, reviews }) {
 
             <button
               className="btn primary"
-              disabled={!form.consent || status === 'sending'}
+              disabled={!form.consent || !form.rating || status === 'sending'}
               style={{ marginTop: 8 }}
             >
               {status === 'sending'
